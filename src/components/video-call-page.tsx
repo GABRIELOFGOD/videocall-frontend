@@ -35,35 +35,70 @@ const VideoCallPage: React.FC<VideoCallPageProps> = ({ roomId = 'room-123' }) =>
   // Refs with proper typing
   const peerConnections = useRef<Map<string, RTCPeerConnection>>(new Map());
   const screenShareStream = useRef<MediaStream | null>(null);
+  const localUserId = useRef<string>('');
 
   const handleSignalingMessage = useCallback(async (message: SignalingMessage) => {
+    console.log('Received signaling message:', message.type, message);
+    
     switch (message.type) {
+      case 'joined-room':
+        // Handle successful room join
+        if (message.roomInfo) {
+          console.log('Joined room successfully:', message.roomInfo);
+          setCallState(prev => ({
+            ...prev,
+            connectedPeers: message.roomInfo!.participants.filter((p: User) => p.id !== localUserId.current),
+            callStatus: 'connected',
+            roomConfirmation: true
+          }));
+          
+          // Create peer connections for existing users (excluding ourselves)
+          const existingPeers = message.roomInfo.participants.filter((p: User) => p.id !== localUserId.current);
+          for (const peer of existingPeers) {
+            console.log('Creating peer connection for existing user:', peer.id);
+            await createPeerConnectionForUser(peer.id, true); // true = initiate offer
+          }
+        }
+        break;
+        
       case 'peer-joined':
+        // Handle new peer joining
         if (message.peerId && message.data) {
+          console.log('New peer joined:', message.peerId, message.data);
           setCallState(prev => ({
             ...prev,
             connectedPeers: [...prev.connectedPeers, message.data!]
           }));
-          await createPeerConnectionForUser(message.peerId);
+          
+          // Create peer connection for new user (don't initiate offer, wait for their offer)
+          await createPeerConnectionForUser(message.peerId, false);
         }
         break;
+        
       case 'offer':
         if (message.offer && message.peerId) {
+          console.log('Received offer from:', message.peerId);
           await handleOffer(message.offer, message.peerId);
         }
         break;
+        
       case 'answer':
         if (message.answer && message.peerId) {
+          console.log('Received answer from:', message.peerId);
           await handleAnswer(message.answer, message.peerId);
         }
         break;
+        
       case 'ice-candidate':
         if (message.candidate && message.peerId) {
+          console.log('Received ICE candidate from:', message.peerId);
           await handleIceCandidate(message.candidate, message.peerId);
         }
         break;
+        
       case 'peer-left':
         if (message.peerId) {
+          console.log('Peer left:', message.peerId);
           handlePeerLeft(message.peerId);
         }
         break;
@@ -71,77 +106,146 @@ const VideoCallPage: React.FC<VideoCallPageProps> = ({ roomId = 'room-123' }) =>
   }, []);
   
   // Create peer connection for new user
-  const createPeerConnectionForUser = async (peerId: string): Promise<void> => {
-    const pc = createPeerConnection(
-      (candidate: RTCIceCandidate) => {
+  const createPeerConnectionForUser = async (peerId: string, shouldInitiateOffer: boolean = false): Promise<void> => {
+    try {
+      console.log('Creating peer connection for:', peerId, 'shouldInitiateOffer:', shouldInitiateOffer);
+      
+      // Don't create duplicate connections
+      if (peerConnections.current.has(peerId)) {
+        console.log('Peer connection already exists for:', peerId);
+        return;
+      }
+      
+      const pc = createPeerConnection(
+        (candidate: RTCIceCandidate) => {
+          console.log('Sending ICE candidate to:', peerId);
+          signalingService.send({
+            type: 'ice-candidate',
+            candidate,
+            target: peerId
+          });
+        },
+        (stream: MediaStream) => {
+          console.log('Received remote stream from:', peerId);
+          setCallState(prev => ({
+            ...prev,
+            remoteStreams: new Map(prev.remoteStreams.set(peerId, stream))
+          }));
+        }
+      );
+      
+      // Add local stream to peer connection
+      if (callState.localStream) {
+        callState.localStream.getTracks().forEach((track: MediaStreamTrack) => {
+          console.log('Adding local track to peer connection:', track.kind);
+          pc.addTrack(track, callState.localStream!);
+        });
+      }
+      
+      peerConnections.current.set(peerId, pc);
+      
+      // Create and send offer only if we should initiate
+      if (shouldInitiateOffer) {
+        console.log('Creating offer for:', peerId);
+        const offer = await pc.createOffer();
+        await pc.setLocalDescription(offer);
+        
         signalingService.send({
-          type: 'ice-candidate',
-          candidate,
+          type: 'offer',
+          offer,
           target: peerId
         });
-      },
-      (stream: MediaStream) => {
-        setCallState(prev => ({
-          ...prev,
-          remoteStreams: new Map(prev.remoteStreams.set(peerId, stream))
-        }));
       }
-    );
-    
-    // Add local stream to peer connection
-    if (callState.localStream) {
-      callState.localStream.getTracks().forEach((track: MediaStreamTrack) => {
-        pc.addTrack(track, callState.localStream!);
-      });
+    } catch (error) {
+      console.error('Error creating peer connection for', peerId, ':', error);
     }
-    
-    peerConnections.current.set(peerId, pc);
-    
-    // Create and send offer
-    const offer = await pc.createOffer();
-    await pc.setLocalDescription(offer);
-    
-    signalingService.send({
-      type: 'offer',
-      offer,
-      target: peerId
-    });
   };
   
   // Handle incoming offer
   const handleOffer = async (offer: RTCSessionDescriptionInit, from: string): Promise<void> => {
-    const pc = peerConnections.current.get(from);
-    if (pc) {
+    try {
+      console.log('Handling offer from:', from);
+      
+      let pc = peerConnections.current.get(from);
+      
+      // Create peer connection if it doesn't exist
+      if (!pc) {
+        console.log('Creating new peer connection for incoming offer from:', from);
+        pc = createPeerConnection(
+          (candidate: RTCIceCandidate) => {
+            signalingService.send({
+              type: 'ice-candidate',
+              candidate,
+              target: from
+            });
+          },
+          (stream: MediaStream) => {
+            setCallState(prev => ({
+              ...prev,
+              remoteStreams: new Map(prev.remoteStreams.set(from, stream))
+            }));
+          }
+        );
+        
+        // Add local stream
+        if (callState.localStream) {
+          callState.localStream.getTracks().forEach((track: MediaStreamTrack) => {
+            pc!.addTrack(track, callState.localStream!);
+          });
+        }
+        
+        peerConnections.current.set(from, pc);
+      }
+      
       await pc.setRemoteDescription(offer);
       const answer = await pc.createAnswer();
       await pc.setLocalDescription(answer);
       
+      console.log('Sending answer to:', from);
       signalingService.send({
         type: 'answer',
         answer,
         target: from
       });
+    } catch (error) {
+      console.error('Error handling offer from', from, ':', error);
     }
   };
   
   // Handle incoming answer
   const handleAnswer = async (answer: RTCSessionDescriptionInit, from: string): Promise<void> => {
-    const pc = peerConnections.current.get(from);
-    if (pc) {
-      await pc.setRemoteDescription(answer);
+    try {
+      const pc = peerConnections.current.get(from);
+      if (pc) {
+        await pc.setRemoteDescription(answer);
+        console.log('Set remote description (answer) for:', from);
+      } else {
+        console.error('No peer connection found for answer from:', from);
+      }
+    } catch (error) {
+      console.error('Error handling answer from', from, ':', error);
     }
   };
   
   // Handle ICE candidate
   const handleIceCandidate = async (candidate: RTCIceCandidate, from: string): Promise<void> => {
-    const pc = peerConnections.current.get(from);
-    if (pc) {
-      await pc.addIceCandidate(candidate);
+    try {
+      const pc = peerConnections.current.get(from);
+      if (pc) {
+        await pc.addIceCandidate(candidate);
+        console.log('Added ICE candidate from:', from);
+      } else {
+        console.error('No peer connection found for ICE candidate from:', from);
+      }
+    } catch (error) {
+      console.error('Error handling ICE candidate from', from, ':', error);
     }
   };
 
   // Handle peer leaving
   const handlePeerLeft = (peerId: string): void => {
+    console.log('Cleaning up peer connection for:', peerId);
+    
     // Close peer connection
     const pc = peerConnections.current.get(peerId);
     if (pc) {
@@ -242,6 +346,8 @@ const VideoCallPage: React.FC<VideoCallPageProps> = ({ roomId = 'room-123' }) =>
   
   // End call
   const endCall = useCallback((): void => {
+    console.log('Ending call');
+    
     if (callState.localStream) {
       callState.localStream.getTracks().forEach((track: MediaStreamTrack) => track.stop());
     }
@@ -249,6 +355,7 @@ const VideoCallPage: React.FC<VideoCallPageProps> = ({ roomId = 'room-123' }) =>
       screenShareStream.current.getTracks().forEach((track: MediaStreamTrack) => track.stop());
     }
     peerConnections.current.forEach((pc: RTCPeerConnection) => pc.close());
+    peerConnections.current.clear();
     
     signalingService.disconnect();
     setCallState(prev => ({ ...prev, callStatus: 'disconnected' }));
@@ -258,13 +365,26 @@ const VideoCallPage: React.FC<VideoCallPageProps> = ({ roomId = 'room-123' }) =>
   useEffect(() => {
     const initializeCall = async (): Promise<void> => {
       try {
+        console.log('Initializing call for room:', roomId);
+        
+        // Generate a unique user ID
+        localUserId.current = 'user-' + Math.random().toString(36).substr(2, 9);
+        console.log('Local user ID:', localUserId.current);
+        
         // Connect to signaling server
         await signalingService.connect();
         
         // Wait a moment for connection
         await new Promise(resolve => setTimeout(resolve, 1000));
         
-        const stream = await getMediaStream();
+        // Get user media with better error handling
+        const stream = await getMediaStream({
+          video: true,
+          audio: true
+        });
+        
+        console.log('Got local stream:', stream);
+        
         setCallState(prev => ({ 
           ...prev, 
           localStream: stream, 
@@ -275,10 +395,11 @@ const VideoCallPage: React.FC<VideoCallPageProps> = ({ roomId = 'room-123' }) =>
         signalingService.setMessageHandler(handleSignalingMessage);
         
         // Join room through signaling
+        console.log('Joining room:', roomId);
         signalingService.send({
           type: 'join-room',
           roomId,
-          peerId: 'local-user'
+          peerId: localUserId.current
         });
         
       } catch (error) {
@@ -290,6 +411,7 @@ const VideoCallPage: React.FC<VideoCallPageProps> = ({ roomId = 'room-123' }) =>
     initializeCall();
     
     return () => {
+      console.log('Cleaning up call');
       // Cleanup on unmount
       if (callState.localStream) {
         callState.localStream.getTracks().forEach((track: MediaStreamTrack) => track.stop());
@@ -298,6 +420,7 @@ const VideoCallPage: React.FC<VideoCallPageProps> = ({ roomId = 'room-123' }) =>
         screenShareStream.current.getTracks().forEach((track: MediaStreamTrack) => track.stop());
       }
       peerConnections.current.forEach((pc: RTCPeerConnection) => pc.close());
+      peerConnections.current.clear();
       signalingService.disconnect();
     };
   }, [roomId, handleSignalingMessage]);
