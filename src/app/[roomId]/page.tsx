@@ -1,13 +1,13 @@
-import VideoCallPage from "@/components/video-call-page"
+import VideoCallPage from "@/components/video-call-page";
+import { use } from "react";
 
 interface PageProps {
-  params: {
-    roomId: string
-  }
+  params: Promise<{
+    roomId: string;
+  }>;
 }
 
-export default async function CallPage({ params }: PageProps) {
-  const resolvedParams = await params;
-  const { roomId } = resolvedParams;
-  return <VideoCallPage roomId={roomId} />
+export default function CallPage({ params }: PageProps) {
+  const { roomId } = use(params); // ✅ no await, no error
+  return <VideoCallPage roomId={roomId} />;
 }
