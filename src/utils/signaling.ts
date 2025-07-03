@@ -1,11 +1,12 @@
 import { Room, SignalingMessage, User } from '@/types/webrtc';
 import { Socket } from 'socket.io-client';
+import { BASEURL } from './constants';
 
 export class SignalingService {
   private socket: Socket | null = null;
   private messageHandler: ((message: SignalingMessage) => void) | null = null;
 
-  async connect(serverUrl: string = 'http://localhost:3001'): Promise<void> {
+  async connect(serverUrl: string = BASEURL!): Promise<void> {
     if (typeof window !== 'undefined' && !this.socket) {
       const { io } = await import('socket.io-client');
       

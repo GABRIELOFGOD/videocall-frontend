@@ -11,6 +11,7 @@ import {
 } from '@/types/webrtc';
 import { createPeerConnection, getMediaStream, getScreenShareStream } from '@/utils/webrtc';
 import { SignalingService } from '@/utils/signaling';
+import RoomJoinConfirmation from './room-join-confirmation';
 
 const signalingService = new SignalingService();
 
@@ -19,7 +20,6 @@ interface VideoCallPageProps {
 }
 
 const VideoCallPage: React.FC<VideoCallPageProps> = ({ roomId = 'room-123' }) => {
-  // State management with proper typing
   const [callState, setCallState] = useState<CallState>({
     localStream: null,
     remoteStreams: new Map(),
@@ -28,14 +28,14 @@ const VideoCallPage: React.FC<VideoCallPageProps> = ({ roomId = 'room-123' }) =>
     isAudioOn: true,
     isScreenSharing: false,
     connectedPeers: [],
-    callStatus: 'connecting'
+    callStatus: 'connecting',
+    roomConfirmation: false,
   });
   
   // Refs with proper typing
   const peerConnections = useRef<Map<string, RTCPeerConnection>>(new Map());
   const screenShareStream = useRef<MediaStream | null>(null);
-  
-  // Handle signaling messages
+
   const handleSignalingMessage = useCallback(async (message: SignalingMessage) => {
     switch (message.type) {
       case 'peer-joined':
@@ -312,6 +312,10 @@ const VideoCallPage: React.FC<VideoCallPageProps> = ({ roomId = 'room-123' }) =>
         </div>
       </div>
     );
+  }
+  
+  if (!callState.roomConfirmation) {
+    return <RoomJoinConfirmation callState={callState} setCallState={setCallState} />
   }
   
   return (

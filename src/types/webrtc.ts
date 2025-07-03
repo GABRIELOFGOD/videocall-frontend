@@ -47,4 +47,5 @@ export interface CallState {
   isScreenSharing: boolean;
   connectedPeers: User[];
   callStatus: 'connecting' | 'connected' | 'disconnected';
+  roomConfirmation?: boolean;
 }
