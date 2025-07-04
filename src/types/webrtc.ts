@@ -46,6 +46,6 @@ export interface CallState {
   isAudioOn: boolean;
   isScreenSharing: boolean;
   connectedPeers: User[];
-  callStatus: 'connecting' | 'connected' | 'disconnected';
+  callStatus: 'connecting' | 'connected' | 'disconnected' | 'waiting';
   roomConfirmation?: boolean;
 }

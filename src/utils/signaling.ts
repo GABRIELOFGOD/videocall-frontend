@@ -108,7 +108,7 @@ export class SignalingService {
   private socket: Socket | null = null;
   private messageHandler: ((message: SignalingMessage) => void) | null = null;
 
-  async connect(serverUrl: string = BASEURL!): Promise<void> {
+  async connect(serverUrl: string = BASEURL): Promise<void> {
     if (typeof window !== 'undefined' && !this.socket) {
       const { io } = await import('socket.io-client');
       
