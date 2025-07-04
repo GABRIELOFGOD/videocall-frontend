@@ -835,6 +835,8 @@ const VideoCallPage: React.FC<{ roomId?: string }> = ({ roomId = 'room-123' }) =
   };
 
   const createPeerConnection = (peerId: string): RTCPeerConnection => {
+    console.log(`[${peerId}] Added tracks:`, callState.localStream?.getTracks().map(t => t.kind));
+
     const pc = new RTCPeerConnection(pcConfig);
 
     pc.onicecandidate = (event) => {
@@ -846,12 +848,23 @@ const VideoCallPage: React.FC<{ roomId?: string }> = ({ roomId = 'room-123' }) =
       }
     };
 
+    // pc.ontrack = (event) => {
+    //   const [stream] = event.streams;
+    //   setCallState(prev => ({
+    //     ...prev,
+    //     remoteStreams: new Map(prev.remoteStreams.set(peerId, stream))
+    //   }));
+    // };
+
     pc.ontrack = (event) => {
-      const [stream] = event.streams;
-      setCallState(prev => ({
-        ...prev,
-        remoteStreams: new Map(prev.remoteStreams.set(peerId, stream))
-      }));
+      console.log(`[${peerId}] Received remote stream`);
+      const stream = event.streams[0];
+      if (stream) {
+        setCallState(prev => ({
+          ...prev,
+          remoteStreams: new Map(prev.remoteStreams.set(peerId, stream))
+        }));
+      }
     };
 
     return pc;
@@ -870,13 +883,7 @@ const VideoCallPage: React.FC<{ roomId?: string }> = ({ roomId = 'room-123' }) =
 
       const offer = await pc.createOffer();
       await pc.setLocalDescription(offer);
-      const tracks = callState.isScreenSharing 
-        ? screenShareStream.current?.getTracks() 
-        : callState.localStream?.getTracks();
-      tracks?.forEach(track => {
-        pc.addTrack(track, callState.isScreenSharing ? screenShareStream.current! : callState.localStream!);
-      });
-      
+
       socketRef.current?.emit('offer', { offer, target: peerId });
     } catch (error) {
       console.error('Error creating offer:', error);
@@ -897,12 +904,7 @@ const VideoCallPage: React.FC<{ roomId?: string }> = ({ roomId = 'room-123' }) =
       await pc.setRemoteDescription(offer);
       const answer = await pc.createAnswer();
       await pc.setLocalDescription(answer);
-      const tracks = callState.isScreenSharing 
-        ? screenShareStream.current?.getTracks() 
-        : callState.localStream?.getTracks();
-      tracks?.forEach(track => {
-        pc.addTrack(track, callState.isScreenSharing ? screenShareStream.current! : callState.localStream!);
-      });
+
       socketRef.current?.emit('answer', { answer, target: peerId });
     } catch (error) {
       console.error('Error handling offer:', error);
