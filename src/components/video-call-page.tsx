@@ -1312,7 +1312,9 @@ const VideoCallPage: React.FC<{ roomId?: string }> = ({ roomId = 'room-123' }) =
           socketRef.current?.emit('join-room', {
             roomId,
             name: callState.username || "User",
-            peerId: localUserId.current
+            peerId: localUserId.current,
+            isVideoOn: callState.isVideoOn,
+            isAudioOn: callState.isAudioOn  
           });
         });
 
