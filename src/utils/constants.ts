@@ -1,1 +1,2 @@
-export const BASEURL = process.env.BASEURL || "http://localhost:8000";
+export const BASEURL = process.env.BASEURL || "https://meet.ccpay.space";
+// export const BASEURL = process.env.BASEURL || "http://localhost:8000";
