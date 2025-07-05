@@ -161,17 +161,19 @@ const RoomJoinConfirmation: React.FC<{
   const togglePreviewVideo = () => {
     if (previewStream) {
       const videoTrack = previewStream.getVideoTracks()[0];
+      console.log("VIDEO TOGGLE ", videoTrack);
       if (videoTrack) {
         videoTrack.enabled = !videoTrack.enabled;
         setIsVideoOn(videoTrack.enabled);
       }
     }
   };
-
+  
   const togglePreviewAudio = () => {
     if (previewStream) {
       const audioTrack = previewStream.getAudioTracks()[0];
       if (audioTrack) {
+        console.log("AUDIO TOGGLE ", audioTrack);
         audioTrack.enabled = !audioTrack.enabled;
         setIsAudioOn(audioTrack.enabled);
       }
@@ -770,9 +772,9 @@ const VideoCallPage: React.FC<{ roomId?: string }> = ({ roomId = 'room-123' }) =
       </div>
       
       {/* Video Grid */}
-      <div className="flex-1 flex flex-row h-[80vh] overflow-hidden">
+      <div className="flex-1 flex md:flex-row flex-col h-[80vh] overflow-hidden">
         {/* Main Speaker Area */}
-        <div className="flex-[3] p-4">
+        <div className="md:flex-[3] flex-1 p-4">
           {(() => {
             const activeId = callState.activeSpeaker;
             const isLocalSpeaker = activeId === localUserId.current;
