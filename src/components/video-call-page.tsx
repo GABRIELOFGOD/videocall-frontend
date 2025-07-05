@@ -305,10 +305,31 @@ const VideoCallPage: React.FC<{ roomId?: string }> = ({ roomId = 'room-123' }) =
       }
     };
 
+    // pc.ontrack = (event) => {
+    //   event.streams[0].getAudioTracks().forEach(t => console.log("Audio track enabled:", t.enabled));
+    //   const stream = event.streams[0];
+    //   if (stream) {
+    //     setCallState(prev => {
+    //       const updated = new Map(prev.remoteStreams);
+    //       updated.set(peerId, stream);
+    //       return {
+    //         ...prev,
+    //         remoteStreams: updated
+    //       };
+    //     });
+    //   }
+    // };
+
     pc.ontrack = (event) => {
-      event.streams[0].getAudioTracks().forEach(t => console.log("Audio track enabled:", t.enabled));
+      console.log('Received track:', event.track.kind, 'enabled:', event.track.enabled);
       const stream = event.streams[0];
       if (stream) {
+        // **FIX: Ensure we handle both video and audio tracks properly**
+        stream.getAudioTracks().forEach(track => {
+          console.log("Audio track enabled:", track.enabled);
+          track.enabled = true; // Ensure audio is always enabled when received
+        });
+        
         setCallState(prev => {
           const updated = new Map(prev.remoteStreams);
           updated.set(peerId, stream);
