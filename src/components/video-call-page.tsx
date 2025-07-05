@@ -284,9 +284,6 @@ const VideoCallPage: React.FC<{ roomId?: string }> = ({ roomId = 'room-123' }) =
   const screenShareStream = useRef<MediaStream | null>(null);
   const localUserId = useRef<string>('');
 
-  const isVideoOnRef = useRef(false);
-  const isAudioOnRef = useRef(false);
-
   // WebRTC configuration
   const pcConfig = {
     iceServers: [
@@ -447,12 +444,16 @@ const VideoCallPage: React.FC<{ roomId?: string }> = ({ roomId = 'room-123' }) =
         videoTrack.enabled = !videoTrack.enabled;
         const newVideoState = videoTrack.enabled;
         
+        // **FIX: Get current audio state from the actual track, not stale state**
+        const audioTrack = callState.localStream.getAudioTracks()[0];
+        const currentAudioState = audioTrack ? audioTrack.enabled : false;
+        
         setCallState(prev => ({ ...prev, isVideoOn: newVideoState }));
         
         socketRef.current?.emit('media-state-change', {
           roomId,
           isVideoOn: newVideoState,
-          isAudioOn: isAudioOnRef.current // Use ref instead of stale state
+          isAudioOn: currentAudioState // Use actual track state
         });
       }
     }
@@ -463,17 +464,22 @@ const VideoCallPage: React.FC<{ roomId?: string }> = ({ roomId = 'room-123' }) =
       const audioTrack = callState.localStream.getAudioTracks()[0];
       if (audioTrack) {
         audioTrack.enabled = !audioTrack.enabled;
-        const newState = audioTrack.enabled;
-        setCallState(prev => ({ ...prev, isAudioOn: newState }));
+        const newAudioState = audioTrack.enabled;
+        
+        // **FIX: Get current video state from the actual track**
+        const videoTrack = callState.localStream.getVideoTracks()[0];
+        const currentVideoState = videoTrack ? videoTrack.enabled : false;
+        
+        setCallState(prev => ({ ...prev, isAudioOn: newAudioState }));
         
         socketRef.current?.emit('media-state-change', {
           roomId,
-          isVideoOn: callState.isVideoOn,
-          isAudioOn: newState
+          isVideoOn: currentVideoState, // Use actual track state
+          isAudioOn: newAudioState
         });
       }
     }
-  }, [callState.localStream, callState.isVideoOn, roomId]);
+  }, [callState.localStream, roomId]);
 
   const toggleScreenShare = useCallback(async () => {
     try {
@@ -679,11 +685,6 @@ const VideoCallPage: React.FC<{ roomId?: string }> = ({ roomId = 'room-123' }) =
       return () => clearInterval(interval);
     }
   }, [callState.localStream, callState.isAudioOn, roomId]);
-
-  useEffect(() => {
-    isVideoOnRef.current = callState.isVideoOn;
-    isAudioOnRef.current = callState.isAudioOn;
-  }, [callState.isVideoOn, callState.isAudioOn]);
 
   if (callState.callStatus === 'disconnected') {
     return (
