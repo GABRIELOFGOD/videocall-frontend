@@ -292,8 +292,39 @@ const VideoCallPage: React.FC<{ roomId?: string }> = ({ roomId = 'room-123' }) =
     ]
   };
 
-  const createPeerConnection = useCallback((peerId: string): RTCPeerConnection => {
-    console.log(`Creating peer connection for ${peerId}`);
+  // const createPeerConnection = useCallback((peerId: string): RTCPeerConnection => {
+  //   console.log(`Creating peer connection for ${peerId}`);
+  //   const pc = new RTCPeerConnection(pcConfig);
+
+  //   pc.onicecandidate = (event) => {
+  //     if (event.candidate && socketRef.current) {
+  //       console.log(`Sending ICE candidate to ${peerId}`);
+  //       socketRef.current.emit('ice-candidate', {
+  //         candidate: event.candidate,
+  //         target: peerId
+  //       });
+  //     }
+  //   };
+
+  //   pc.ontrack = (event) => {
+  //     console.log(`Received track from ${peerId}:`, event.track.kind);
+  //     const stream = event.streams[0];
+  //     if (stream) {
+  //       setCallState(prev => ({
+  //         ...prev,
+  //         remoteStreams: new Map(prev.remoteStreams.set(peerId, stream))
+  //       }));
+  //     }
+  //   };
+
+  //   pc.oniceconnectionstatechange = () => {
+  //     console.log(`ICE connection state for ${peerId}:`, pc.iceConnectionState);
+  //   };
+
+  //   return pc;
+  // }, []);
+
+  function createPeerConnection(peerId: string): RTCPeerConnection {
     const pc = new RTCPeerConnection(pcConfig);
 
     pc.onicecandidate = (event) => {
@@ -307,55 +338,101 @@ const VideoCallPage: React.FC<{ roomId?: string }> = ({ roomId = 'room-123' }) =
     };
 
     pc.ontrack = (event) => {
-      console.log(`Received track from ${peerId}:`, event.track.kind);
+      event.streams[0].getAudioTracks().forEach(t => console.log("Audio track enabled:", t.enabled));
       const stream = event.streams[0];
       if (stream) {
-        setCallState(prev => ({
-          ...prev,
-          remoteStreams: new Map(prev.remoteStreams.set(peerId, stream))
-        }));
+        // Do not mutate the old Map directly!
+        setCallState(prev => {
+          const updated = new Map(prev.remoteStreams);
+          updated.set(peerId, stream);
+          return {
+            ...prev,
+            remoteStreams: updated
+          };
+        });
       }
     };
 
     pc.oniceconnectionstatechange = () => {
-      console.log(`ICE connection state for ${peerId}:`, pc.iceConnectionState);
+      console.log(`ICE state for ${peerId}: ${pc.iceConnectionState}`);
     };
 
     return pc;
-  }, []);
+  }
+  
+  // const createOffer = useCallback(async (peerId: string) => {
+  //   try {
+  //     console.log(`Creating offer for ${peerId}`);
+  //     const pc = createPeerConnection(peerId);
+  //     peerConnections.current.set(peerId, pc);
+
+  //     if (callState.localStream) {
+  //       callState.localStream.getTracks().forEach(track => {
+  //         console.log(`Adding ${track.kind} track to peer connection for ${peerId}`);
+  //         pc.addTrack(track, callState.localStream!);
+  //       });
+  //     }
+
+
+  //     const offer = await pc.createOffer();
+  //     await pc.setLocalDescription(offer);
+  //     console.log(`Sending offer to ${peerId}`);
+  //     socketRef.current?.emit('offer', { offer, target: peerId });
+  //   } catch (error) {
+  //     console.error('Error creating offer:', error);
+  //   }
+  // }, [callState.localStream, createPeerConnection]);
 
   const createOffer = useCallback(async (peerId: string) => {
     try {
-      console.log(`Creating offer for ${peerId}`);
       const pc = createPeerConnection(peerId);
       peerConnections.current.set(peerId, pc);
 
       if (callState.localStream) {
         callState.localStream.getTracks().forEach(track => {
-          console.log(`Adding ${track.kind} track to peer connection for ${peerId}`);
           pc.addTrack(track, callState.localStream!);
         });
       }
 
-
       const offer = await pc.createOffer();
       await pc.setLocalDescription(offer);
-      console.log(`Sending offer to ${peerId}`);
+
       socketRef.current?.emit('offer', { offer, target: peerId });
-    } catch (error) {
-      console.error('Error creating offer:', error);
+    } catch (err) {
+      console.error('Error creating offer:', err);
     }
-  }, [callState.localStream, createPeerConnection]);
+  }, [callState.localStream]);
+
+  // const handleOffer = useCallback(async (offer: RTCSessionDescriptionInit, peerId: string) => {
+  //   try {
+  //     console.log(`Handling offer from ${peerId}`);
+  //     const pc = createPeerConnection(peerId);
+  //     peerConnections.current.set(peerId, pc);
+
+  //     if (callState.localStream) {
+  //       callState.localStream.getTracks().forEach(track => {
+  //         console.log(`Adding ${track.kind} track to peer connection for ${peerId}`);
+  //         pc.addTrack(track, callState.localStream!);
+  //       });
+  //     }
+
+  //     await pc.setRemoteDescription(offer);
+  //     const answer = await pc.createAnswer();
+  //     await pc.setLocalDescription(answer);
+  //     console.log(`Sending answer to ${peerId}`);
+  //     socketRef.current?.emit('answer', { answer, target: peerId });
+  //   } catch (error) {
+  //     console.error('Error handling offer:', error);
+  //   }
+  // }, [callState.localStream, createPeerConnection]);
 
   const handleOffer = useCallback(async (offer: RTCSessionDescriptionInit, peerId: string) => {
     try {
-      console.log(`Handling offer from ${peerId}`);
       const pc = createPeerConnection(peerId);
       peerConnections.current.set(peerId, pc);
 
       if (callState.localStream) {
         callState.localStream.getTracks().forEach(track => {
-          console.log(`Adding ${track.kind} track to peer connection for ${peerId}`);
           pc.addTrack(track, callState.localStream!);
         });
       }
@@ -363,12 +440,12 @@ const VideoCallPage: React.FC<{ roomId?: string }> = ({ roomId = 'room-123' }) =
       await pc.setRemoteDescription(offer);
       const answer = await pc.createAnswer();
       await pc.setLocalDescription(answer);
-      console.log(`Sending answer to ${peerId}`);
+
       socketRef.current?.emit('answer', { answer, target: peerId });
-    } catch (error) {
-      console.error('Error handling offer:', error);
+    } catch (err) {
+      console.error('Error handling offer:', err);
     }
-  }, [callState.localStream, createPeerConnection]);
+  }, [callState.localStream]);
 
   const handleAnswer = useCallback(async (answer: RTCSessionDescriptionInit, peerId: string) => {
     try {
