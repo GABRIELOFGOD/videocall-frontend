@@ -1191,6 +1191,23 @@ const VideoCallPage: React.FC<{ roomId?: string }> = ({ roomId = 'room-123' }) =
     }
   }, []);
 
+  // const toggleVideo = useCallback(() => {
+  //   if (callState.localStream) {
+  //     const videoTrack = callState.localStream.getVideoTracks()[0];
+  //     if (videoTrack) {
+  //       videoTrack.enabled = !videoTrack.enabled;
+  //       const newState = videoTrack.enabled;
+  //       setCallState(prev => ({ ...prev, isVideoOn: newState }));
+        
+  //       socketRef.current?.emit('media-state-change', {
+  //         roomId,
+  //         isVideoOn: newState,
+  //         isAudioOn: callState.isAudioOn
+  //       });
+  //     }
+  //   }
+  // }, [callState.localStream, callState.isAudioOn, roomId]);
+
   const toggleVideo = useCallback(() => {
     if (callState.localStream) {
       const videoTrack = callState.localStream.getVideoTracks()[0];
@@ -1449,7 +1466,7 @@ const VideoCallPage: React.FC<{ roomId?: string }> = ({ roomId = 'room-123' }) =
   return (
     <div className="min-h-screen bg-gray-900 text-white flex flex-col">
       {/* Header */}
-      <div className="bg-gray-800 px-6 py-4 flex items-center justify-between shadow-lg">
+      <div className="bg-gray-800 px-6 py-4 flex items-center justify-between shadow-lg flex-shrink-0">
         <div className="flex items-center space-x-4">
           <div className="w-3 h-3 bg-green-500 rounded-full"></div>
           <span className="font-medium">Room: {roomId}</span>
@@ -1473,52 +1490,8 @@ const VideoCallPage: React.FC<{ roomId?: string }> = ({ roomId = 'room-123' }) =
       </div>
       
       {/* Video Grid */}
-      <div className="flex-1 p-6 overflow-hidden">
-        {/* <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 h-full">
-          <VideoTile
-            stream={callState.isScreenSharing ? screenShareStream.current : callState.localStream}
-            name="You"
-            isLocal={true}
-            isScreenShare={callState.isScreenSharing}
-            isVideoOn={callState.isVideoOn}
-            isAudioOn={callState.isAudioOn}
-            raisedHand={callState.isHandRaised}
-            isActiveSpeaker={callState.activeSpeaker === localUserId.current}
-          />
-          
-          {Array.from(callState.remoteStreams.entries()).map(([peerId, stream]) => {
-            const peer = callState.connectedPeers.find((p: User) => p.id === peerId);
-            return (
-              <VideoTile 
-                key={peerId}
-                stream={stream}
-                name={peer?.name || 'Unknown User'}
-                isLocal={false}
-                isVideoOn={peer?.isVideoOn}
-                isAudioOn={peer?.isAudioOn}
-                raisedHand={peer?.raisedHand}
-                isActiveSpeaker={callState.activeSpeaker === peerId}
-              />
-            );
-          })}
-          
-          {callState.connectedPeers
-            .filter((peer: User) => !callState.remoteStreams.has(peer.id))
-            .map((peer: User) => (
-              <VideoTile 
-                key={peer.id}
-                stream={null}
-                name={peer.name}
-                isLocal={false}
-                isVideoOn={peer.isVideoOn}
-                isAudioOn={peer.isAudioOn}
-                raisedHand={peer.raisedHand}
-                isActiveSpeaker={callState.activeSpeaker === peer.id}
-              />
-            ))}
-        </div> */}
+      {/* <div className="flex-1 p-6 overflow-hidden">
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 h-full">
-          {/* Active Speaker Tile */}
           {(() => {
             const activeId = callState.activeSpeaker;
             const isLocalSpeaker = activeId === localUserId.current;
@@ -1553,7 +1526,6 @@ const VideoCallPage: React.FC<{ roomId?: string }> = ({ roomId = 'room-123' }) =
             );
           })()}
 
-          {/* Local Tile (if not active speaker) */}
           {callState.activeSpeaker !== localUserId.current && (
             <VideoTile
               stream={callState.isScreenSharing ? screenShareStream.current : callState.localStream}
@@ -1567,7 +1539,6 @@ const VideoCallPage: React.FC<{ roomId?: string }> = ({ roomId = 'room-123' }) =
             />
           )}
 
-          {/* Remote Tiles (excluding active speaker) */}
           {Array.from(callState.remoteStreams.entries())
             .filter(([peerId]) => peerId !== callState.activeSpeaker)
             .map(([peerId, stream]) => {
@@ -1586,7 +1557,6 @@ const VideoCallPage: React.FC<{ roomId?: string }> = ({ roomId = 'room-123' }) =
               );
             })}
 
-          {/* Fallback tiles for peers with no stream yet */}
           {callState.connectedPeers
             .filter(
               (peer) =>
@@ -1606,10 +1576,91 @@ const VideoCallPage: React.FC<{ roomId?: string }> = ({ roomId = 'room-123' }) =
               />
             ))}
         </div>
+      </div> */}
+      <div className="flex-1 flex flex-col overflow-hidden">
+        {/* Main Speaker Area */}
+        <div className="flex-1 p-4">
+          {(() => {
+            const activeId = callState.activeSpeaker;
+            const isLocalSpeaker = activeId === localUserId.current;
+            
+            // If no active speaker, show local stream as main
+            const mainStream = isLocalSpeaker || !activeId
+              ? (callState.isScreenSharing ? screenShareStream.current : callState.localStream)
+              : callState.remoteStreams.get(activeId);
+
+            const mainUser = isLocalSpeaker || !activeId
+              ? {
+                  name: "You",
+                  isLocal: true,
+                  isVideoOn: callState.isVideoOn,
+                  isAudioOn: callState.isAudioOn,
+                  raisedHand: callState.isHandRaised,
+                }
+              : callState.connectedPeers.find((p) => p.id === activeId);
+
+            return (
+              <div className="w-full h-full">
+                <VideoTile
+                  stream={mainStream ?? null}
+                  name={mainUser?.name || "Unknown"}
+                  isLocal={mainUser && 'isLocal' in mainUser ? mainUser.isLocal : false}
+                  isVideoOn={mainUser?.isVideoOn}
+                  isAudioOn={mainUser?.isAudioOn}
+                  raisedHand={mainUser?.raisedHand}
+                  isActiveSpeaker={true}
+                />
+              </div>
+            );
+          })()}
+        </div>
+
+        {/* Participant Strip */}
+        {(callState.connectedPeers.length > 0 || (callState.activeSpeaker && callState.activeSpeaker !== localUserId.current)) && (
+          <div className="bg-gray-800 p-4 border-t border-gray-700">
+            <div className="flex space-x-3 overflow-x-auto">
+              {/* Local tile (if not main speaker) */}
+              {callState.activeSpeaker && callState.activeSpeaker !== localUserId.current && (
+                <div className="flex-shrink-0 w-32 h-24">
+                  <VideoTile
+                    stream={callState.isScreenSharing ? screenShareStream.current : callState.localStream}
+                    name="You"
+                    isLocal={true}
+                    isScreenShare={callState.isScreenSharing}
+                    isVideoOn={callState.isVideoOn}
+                    isAudioOn={callState.isAudioOn}
+                    raisedHand={callState.isHandRaised}
+                    isActiveSpeaker={false}
+                  />
+                </div>
+              )}
+
+              {/* Remote participants (excluding active speaker) */}
+              {callState.connectedPeers
+                .filter(peer => peer.id !== callState.activeSpeaker)
+                .map((peer) => {
+                  const stream = callState.remoteStreams.get(peer.id);
+                  return (
+                    <div key={peer.id} className="flex-shrink-0 w-32 h-24">
+                      <VideoTile
+                        stream={stream || null}
+                        name={peer.name}
+                        isLocal={false}
+                        isVideoOn={peer.isVideoOn}
+                        isAudioOn={peer.isAudioOn}
+                        raisedHand={peer.raisedHand}
+                        isActiveSpeaker={false}
+                      />
+                    </div>
+                  );
+                })}
+            </div>
+          </div>
+        )}
       </div>
       
       {/* Controls */}
-      <div className="bg-gray-800 px-6 py-4 border-t border-gray-700">
+      <div className="bg-gray-800 px-6 py-4 border-t border-gray-700 flex-shrink-0">
         <div className="flex items-center justify-center space-x-4">
           <div className="flex items-center space-x-2">
             <ControlButton
