@@ -1115,13 +1115,19 @@ const VideoCallPage: React.FC<{ roomId?: string }> = ({ roomId = 'room-123' }) =
       const pc = createPeerConnection(peerId);
       peerConnections.current.set(peerId, pc);
 
-      // Add local stream tracks to peer connection
+      // if (callState.localStream) {
+      //   callState.localStream.getTracks().forEach(track => {
+      //     console.log(`Adding ${track.kind} track to peer connection for ${peerId}`);
+      //     pc.addTrack(track, callState.localStream!);
+      //   });
+      // }
       if (callState.localStream) {
         callState.localStream.getTracks().forEach(track => {
           console.log(`Adding ${track.kind} track to peer connection for ${peerId}`);
           pc.addTrack(track, callState.localStream!);
         });
       }
+
 
       const offer = await pc.createOffer();
       await pc.setLocalDescription(offer);
@@ -1138,7 +1144,12 @@ const VideoCallPage: React.FC<{ roomId?: string }> = ({ roomId = 'room-123' }) =
       const pc = createPeerConnection(peerId);
       peerConnections.current.set(peerId, pc);
 
-      // Add local stream tracks to peer connection
+      // if (callState.localStream) {
+      //   callState.localStream.getTracks().forEach(track => {
+      //     console.log(`Adding ${track.kind} track to peer connection for ${peerId}`);
+      //     pc.addTrack(track, callState.localStream!);
+      //   });
+      // }
       if (callState.localStream) {
         callState.localStream.getTracks().forEach(track => {
           console.log(`Adding ${track.kind} track to peer connection for ${peerId}`);
@@ -1463,8 +1474,7 @@ const VideoCallPage: React.FC<{ roomId?: string }> = ({ roomId = 'room-123' }) =
       
       {/* Video Grid */}
       <div className="flex-1 p-6 overflow-hidden">
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 h-full">
-          {/* Local Video */}
+        {/* <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 h-full">
           <VideoTile
             stream={callState.isScreenSharing ? screenShareStream.current : callState.localStream}
             name="You"
@@ -1476,7 +1486,6 @@ const VideoCallPage: React.FC<{ roomId?: string }> = ({ roomId = 'room-123' }) =
             isActiveSpeaker={callState.activeSpeaker === localUserId.current}
           />
           
-          {/* Remote Videos */}
           {Array.from(callState.remoteStreams.entries()).map(([peerId, stream]) => {
             const peer = callState.connectedPeers.find((p: User) => p.id === peerId);
             return (
@@ -1493,7 +1502,6 @@ const VideoCallPage: React.FC<{ roomId?: string }> = ({ roomId = 'room-123' }) =
             );
           })}
           
-          {/* Connected peer placeholders */}
           {callState.connectedPeers
             .filter((peer: User) => !callState.remoteStreams.has(peer.id))
             .map((peer: User) => (
@@ -1506,6 +1514,95 @@ const VideoCallPage: React.FC<{ roomId?: string }> = ({ roomId = 'room-123' }) =
                 isAudioOn={peer.isAudioOn}
                 raisedHand={peer.raisedHand}
                 isActiveSpeaker={callState.activeSpeaker === peer.id}
+              />
+            ))}
+        </div> */}
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 h-full">
+          {/* Active Speaker Tile */}
+          {(() => {
+            const activeId = callState.activeSpeaker;
+            const isLocalSpeaker = activeId === localUserId.current;
+            const stream = isLocalSpeaker
+              ? (callState.isScreenSharing ? screenShareStream.current : callState.localStream)
+              : callState.remoteStreams.get(activeId || '');
+
+            const user = isLocalSpeaker
+              ? {
+                  name: "You",
+                  isLocal: true,
+                  isVideoOn: callState.isVideoOn,
+                  isAudioOn: callState.isAudioOn,
+                  raisedHand: callState.isHandRaised,
+                }
+              : callState.connectedPeers.find((p) => p.id === activeId);
+
+            if (!stream || !user) return null;
+
+            return (
+              <div className="col-span-full">
+                <VideoTile
+                  stream={stream}
+                  name={user.name}
+                  isLocal={'isLocal' in user ? user.isLocal : false}
+                  isVideoOn={user.isVideoOn}
+                  isAudioOn={user.isAudioOn}
+                  raisedHand={user.raisedHand}
+                  isActiveSpeaker={true}
+                />
+              </div>
+            );
+          })()}
+
+          {/* Local Tile (if not active speaker) */}
+          {callState.activeSpeaker !== localUserId.current && (
+            <VideoTile
+              stream={callState.isScreenSharing ? screenShareStream.current : callState.localStream}
+              name="You"
+              isLocal={true}
+              isScreenShare={callState.isScreenSharing}
+              isVideoOn={callState.isVideoOn}
+              isAudioOn={callState.isAudioOn}
+              raisedHand={callState.isHandRaised}
+              isActiveSpeaker={false}
+            />
+          )}
+
+          {/* Remote Tiles (excluding active speaker) */}
+          {Array.from(callState.remoteStreams.entries())
+            .filter(([peerId]) => peerId !== callState.activeSpeaker)
+            .map(([peerId, stream]) => {
+              const peer = callState.connectedPeers.find((p) => p.id === peerId);
+              return (
+                <VideoTile
+                  key={peerId}
+                  stream={stream}
+                  name={peer?.name || 'Unknown'}
+                  isLocal={false}
+                  isVideoOn={peer?.isVideoOn}
+                  isAudioOn={peer?.isAudioOn}
+                  raisedHand={peer?.raisedHand}
+                  isActiveSpeaker={false}
+                />
+              );
+            })}
+
+          {/* Fallback tiles for peers with no stream yet */}
+          {callState.connectedPeers
+            .filter(
+              (peer) =>
+                !callState.remoteStreams.has(peer.id) &&
+                peer.id !== callState.activeSpeaker
+            )
+            .map((peer) => (
+              <VideoTile
+                key={peer.id}
+                stream={null}
+                name={peer.name}
+                isLocal={false}
+                isVideoOn={peer.isVideoOn}
+                isAudioOn={peer.isAudioOn}
+                raisedHand={peer.raisedHand}
+                isActiveSpeaker={false}
               />
             ))}
         </div>
