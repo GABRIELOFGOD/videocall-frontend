@@ -284,6 +284,9 @@ const VideoCallPage: React.FC<{ roomId?: string }> = ({ roomId = 'room-123' }) =
   const screenShareStream = useRef<MediaStream | null>(null);
   const localUserId = useRef<string>('');
 
+  const isVideoOnRef = useRef(false);
+  const isAudioOnRef = useRef(false);
+
   // WebRTC configuration
   const pcConfig = {
     iceServers: [
@@ -437,53 +440,23 @@ const VideoCallPage: React.FC<{ roomId?: string }> = ({ roomId = 'room-123' }) =
   //   }
   // }, [callState.localStream, callState.isAudioOn, roomId]);
 
-  const toggleVideo = useCallback(async () => {
+  const toggleVideo = useCallback(() => {
     if (callState.localStream) {
       const videoTrack = callState.localStream.getVideoTracks()[0];
       if (videoTrack) {
-        const newState = !callState.isVideoOn;
+        videoTrack.enabled = !videoTrack.enabled;
+        const newVideoState = videoTrack.enabled;
         
-        if (newState) {
-          // Enable video track
-          videoTrack.enabled = true;
-        } else {
-          // **FIX: Replace video track with a black/empty track instead of disabling**
-          try {
-            const canvas = document.createElement('canvas');
-            canvas.width = 1;
-            canvas.height = 1;
-            const ctx = canvas.getContext('2d');
-            ctx!.fillStyle = 'black';
-            ctx?.fillRect(0, 0, 1, 1);
-            
-            const blackStream = canvas.captureStream(1);
-            const blackVideoTrack = blackStream.getVideoTracks()[0];
-            
-            // Replace video track for all peer connections
-            peerConnections.current.forEach(async (pc) => {
-              const sender = pc.getSenders().find(s => s.track?.kind === 'video');
-              if (sender) {
-                await sender.replaceTrack(blackVideoTrack);
-              }
-            });
-            
-            videoTrack.enabled = false;
-          } catch (error) {
-            console.error('Error replacing video track:', error);
-            videoTrack.enabled = false;
-          }
-        }
-        
-        setCallState(prev => ({ ...prev, isVideoOn: newState }));
+        setCallState(prev => ({ ...prev, isVideoOn: newVideoState }));
         
         socketRef.current?.emit('media-state-change', {
           roomId,
-          isVideoOn: newState,
-          isAudioOn: callState.isAudioOn
+          isVideoOn: newVideoState,
+          isAudioOn: isAudioOnRef.current // Use ref instead of stale state
         });
       }
     }
-  }, [callState.localStream, callState.isVideoOn, callState.isAudioOn, roomId]);
+  }, [callState.localStream, roomId]);
 
   const toggleAudio = useCallback(() => {
     if (callState.localStream) {
@@ -706,6 +679,11 @@ const VideoCallPage: React.FC<{ roomId?: string }> = ({ roomId = 'room-123' }) =
       return () => clearInterval(interval);
     }
   }, [callState.localStream, callState.isAudioOn, roomId]);
+
+  useEffect(() => {
+    isVideoOnRef.current = callState.isVideoOn;
+    isAudioOnRef.current = callState.isAudioOn;
+  }, [callState.isVideoOn, callState.isAudioOn]);
 
   if (callState.callStatus === 'disconnected') {
     return (
