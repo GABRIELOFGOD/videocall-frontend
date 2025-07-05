@@ -437,29 +437,45 @@ const VideoCallPage: React.FC<{ roomId?: string }> = ({ roomId = 'room-123' }) =
   //   }
   // }, [callState.localStream, callState.isAudioOn, roomId]);
 
-  const toggleVideo = useCallback(() => {
+  const toggleVideo = useCallback(async () => {
     if (callState.localStream) {
       const videoTrack = callState.localStream.getVideoTracks()[0];
       if (videoTrack) {
-        videoTrack.enabled = !videoTrack.enabled;
-        const newState = videoTrack.enabled;
+        const newState = !callState.isVideoOn;
         
-        // Update local state
+        if (newState) {
+          // Enable video track
+          videoTrack.enabled = true;
+        } else {
+          // **FIX: Replace video track with a black/empty track instead of disabling**
+          try {
+            const canvas = document.createElement('canvas');
+            canvas.width = 1;
+            canvas.height = 1;
+            const ctx = canvas.getContext('2d');
+            ctx!.fillStyle = 'black';
+            ctx?.fillRect(0, 0, 1, 1);
+            
+            const blackStream = canvas.captureStream(1);
+            const blackVideoTrack = blackStream.getVideoTracks()[0];
+            
+            // Replace video track for all peer connections
+            peerConnections.current.forEach(async (pc) => {
+              const sender = pc.getSenders().find(s => s.track?.kind === 'video');
+              if (sender) {
+                await sender.replaceTrack(blackVideoTrack);
+              }
+            });
+            
+            videoTrack.enabled = false;
+          } catch (error) {
+            console.error('Error replacing video track:', error);
+            videoTrack.enabled = false;
+          }
+        }
+        
         setCallState(prev => ({ ...prev, isVideoOn: newState }));
         
-        // **FIX: Re-negotiate with all peers to ensure audio continues**
-        peerConnections.current.forEach(async (pc, peerId) => {
-          try {
-            // Create new offer to renegotiate
-            const offer = await pc.createOffer();
-            await pc.setLocalDescription(offer);
-            socketRef.current?.emit('offer', { offer, target: peerId });
-          } catch (error) {
-            console.error(`Error renegotiating with ${peerId}:`, error);
-          }
-        });
-        
-        // Emit media state change
         socketRef.current?.emit('media-state-change', {
           roomId,
           isVideoOn: newState,
@@ -467,7 +483,7 @@ const VideoCallPage: React.FC<{ roomId?: string }> = ({ roomId = 'room-123' }) =
         });
       }
     }
-  }, [callState.localStream, callState.isAudioOn, roomId]);
+  }, [callState.localStream, callState.isVideoOn, callState.isAudioOn, roomId]);
 
   const toggleAudio = useCallback(() => {
     if (callState.localStream) {
