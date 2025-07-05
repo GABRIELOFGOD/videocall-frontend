@@ -399,14 +399,46 @@ const VideoCallPage: React.FC<{ roomId?: string }> = ({ roomId = 'room-123' }) =
       console.error('Error handling ICE candidate:', error);
     }
   }, []);
+  // const toggleVideo = useCallback(() => {
+  //   if (callState.localStream) {
+  //     const videoTrack = callState.localStream.getVideoTracks()[0];
+  //     if (videoTrack) {
+  //       videoTrack.enabled = !videoTrack.enabled;
+  //       const newState = videoTrack.enabled;
+  //       setCallState(prev => ({ ...prev, isVideoOn: newState }));
+        
+  //       socketRef.current?.emit('media-state-change', {
+  //         roomId,
+  //         isVideoOn: newState,
+  //         isAudioOn: callState.isAudioOn
+  //       });
+  //     }
+  //   }
+  // }, [callState.localStream, callState.isAudioOn, roomId]);
+
   const toggleVideo = useCallback(() => {
     if (callState.localStream) {
       const videoTrack = callState.localStream.getVideoTracks()[0];
       if (videoTrack) {
         videoTrack.enabled = !videoTrack.enabled;
         const newState = videoTrack.enabled;
+        
+        // Update local state
         setCallState(prev => ({ ...prev, isVideoOn: newState }));
         
+        // **FIX: Re-negotiate with all peers to ensure audio continues**
+        peerConnections.current.forEach(async (pc, peerId) => {
+          try {
+            // Create new offer to renegotiate
+            const offer = await pc.createOffer();
+            await pc.setLocalDescription(offer);
+            socketRef.current?.emit('offer', { offer, target: peerId });
+          } catch (error) {
+            console.error(`Error renegotiating with ${peerId}:`, error);
+          }
+        });
+        
+        // Emit media state change
         socketRef.current?.emit('media-state-change', {
           roomId,
           isVideoOn: newState,
