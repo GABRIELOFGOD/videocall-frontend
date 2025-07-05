@@ -125,7 +125,8 @@ const RoomJoinConfirmation: React.FC<{
   callState: CallState;
   setCallState: React.Dispatch<React.SetStateAction<CallState>>;
   roomId: string;
-}> = ({ callState, setCallState, roomId }) => {
+  originalStreamRef: React.MutableRefObject<MediaStream | null>;
+}> = ({ callState, setCallState, roomId, originalStreamRef }) => {
   const [userName, setUserName] = useState('');
   const [previewStream, setPreviewStream] = useState<MediaStream | null>(null);
   const [isVideoOn, setIsVideoOn] = useState(true);
@@ -178,8 +179,26 @@ const RoomJoinConfirmation: React.FC<{
     }
   };
 
+  // const joinRoom = () => {
+  //   if (!userName.trim()) return;
+    
+  //   setCallState(prev => ({
+  //     ...prev,
+  //     roomConfirmation: true,
+  //     localStream: previewStream,
+  //     isVideoOn,
+  //     isAudioOn,
+  //     username: userName
+  //   }));
+  // };
+
   const joinRoom = () => {
     if (!userName.trim()) return;
+    
+    // **FIX: Store the original stream reference**
+    if (previewStream) {
+      originalStreamRef.current = previewStream;
+    }
     
     setCallState(prev => ({
       ...prev,
@@ -284,6 +303,9 @@ const VideoCallPage: React.FC<{ roomId?: string }> = ({ roomId = 'room-123' }) =
   const screenShareStream = useRef<MediaStream | null>(null);
   const localUserId = useRef<string>('');
 
+  const originalStreamRef = useRef<MediaStream | null>(null);
+  const audioOnlyStreamRef = useRef<MediaStream | null>(null);
+
   // WebRTC configuration
   const pcConfig = {
     iceServers: [
@@ -305,34 +327,23 @@ const VideoCallPage: React.FC<{ roomId?: string }> = ({ roomId = 'room-123' }) =
       }
     };
 
-    // pc.ontrack = (event) => {
-    //   event.streams[0].getAudioTracks().forEach(t => console.log("Audio track enabled:", t.enabled));
-    //   const stream = event.streams[0];
-    //   if (stream) {
-    //     setCallState(prev => {
-    //       const updated = new Map(prev.remoteStreams);
-    //       updated.set(peerId, stream);
-    //       return {
-    //         ...prev,
-    //         remoteStreams: updated
-    //       };
-    //     });
-    //   }
-    // };
-
     pc.ontrack = (event) => {
       console.log('Received track:', event.track.kind, 'enabled:', event.track.enabled);
       const stream = event.streams[0];
       if (stream) {
-        // **FIX: Ensure we handle both video and audio tracks properly**
-        stream.getAudioTracks().forEach(track => {
-          console.log("Audio track enabled:", track.enabled);
-          track.enabled = true; // Ensure audio is always enabled when received
+        // **FIX: Create a new MediaStream to avoid reference issues**
+        const newStream = new MediaStream();
+        stream.getTracks().forEach(track => {
+          newStream.addTrack(track);
+          // Ensure audio tracks are always enabled when received
+          if (track.kind === 'audio') {
+            track.enabled = true;
+          }
         });
         
         setCallState(prev => {
           const updated = new Map(prev.remoteStreams);
-          updated.set(peerId, stream);
+          updated.set(peerId, newStream);
           return {
             ...prev,
             remoteStreams: updated
@@ -341,16 +352,13 @@ const VideoCallPage: React.FC<{ roomId?: string }> = ({ roomId = 'room-123' }) =
       }
     };
 
-    pc.getReceivers().forEach((receiver) => {
-      if (receiver.track.kind === 'audio') {
-        console.log(
-          `[RECEIVER AUDIO TRACK] enabled: ${receiver.track.enabled}, muted: ${receiver.track.muted}`
-        );
+    // **FIX: Add connection state monitoring**
+    pc.onconnectionstatechange = () => {
+      console.log(`Connection state for ${peerId}: ${pc.connectionState}`);
+      if (pc.connectionState === 'failed') {
+        // Attempt to restart ICE
+        pc.restartIce();
       }
-    });
-
-    pc.oniceconnectionstatechange = () => {
-      console.log(`ICE state for ${peerId}: ${pc.iceConnectionState}`);
     };
 
     return pc;
@@ -420,44 +428,72 @@ const VideoCallPage: React.FC<{ roomId?: string }> = ({ roomId = 'room-123' }) =
       console.error('Error handling ICE candidate:', error);
     }
   }, []);
-  // const toggleVideo = useCallback(() => {
-  //   if (callState.localStream) {
-  //     const videoTrack = callState.localStream.getVideoTracks()[0];
-  //     if (videoTrack) {
-  //       videoTrack.enabled = !videoTrack.enabled;
-  //       const newState = videoTrack.enabled;
-  //       setCallState(prev => ({ ...prev, isVideoOn: newState }));
-        
-  //       socketRef.current?.emit('media-state-change', {
-  //         roomId,
-  //         isVideoOn: newState,
-  //         isAudioOn: callState.isAudioOn
-  //       });
-  //     }
-  //   }
-  // }, [callState.localStream, callState.isAudioOn, roomId]);
 
-  const toggleVideo = useCallback(() => {
-    if (callState.localStream) {
-      const videoTrack = callState.localStream.getVideoTracks()[0];
-      if (videoTrack) {
-        videoTrack.enabled = !videoTrack.enabled;
-        const newVideoState = videoTrack.enabled;
+  const toggleVideo = useCallback(async () => {
+    if (!callState.localStream) return;
+
+    try {
+      const newVideoState = !callState.isVideoOn;
+      
+      if (newVideoState) {
+        // **FIX: Turning video ON - use original stream with video**
+        if (originalStreamRef.current) {
+          const videoTrack = originalStreamRef.current.getVideoTracks()[0];
+          if (videoTrack) {
+            videoTrack.enabled = true;
+            
+            // Replace tracks in all peer connections
+            peerConnections.current.forEach(async (pc) => {
+              const sender = pc.getSenders().find(s => s.track?.kind === 'video');
+              if (sender) {
+                await sender.replaceTrack(videoTrack);
+              }
+            });
+            
+            setCallState(prev => ({ 
+              ...prev, 
+              isVideoOn: true,
+              localStream: originalStreamRef.current 
+            }));
+          }
+        }
+      } else {
+        // **FIX: Turning video OFF - create audio-only stream**
+        if (!audioOnlyStreamRef.current) {
+          const audioTrack = callState.localStream.getAudioTracks()[0];
+          if (audioTrack) {
+            audioOnlyStreamRef.current = new MediaStream([audioTrack.clone()]);
+          }
+        }
         
-        // **FIX: Get current audio state from the actual track, not stale state**
-        const audioTrack = callState.localStream.getAudioTracks()[0];
-        const currentAudioState = audioTrack ? audioTrack.enabled : false;
-        
-        setCallState(prev => ({ ...prev, isVideoOn: newVideoState }));
-        
-        socketRef.current?.emit('media-state-change', {
-          roomId,
-          isVideoOn: newVideoState,
-          isAudioOn: currentAudioState // Use actual track state
-        });
+        if (audioOnlyStreamRef.current) {
+          // Replace video track with null (remove video)
+          peerConnections.current.forEach(async (pc) => {
+            const sender = pc.getSenders().find(s => s.track?.kind === 'video');
+            if (sender) {
+              await sender.replaceTrack(null);
+            }
+          });
+          
+          setCallState(prev => ({ 
+            ...prev, 
+            isVideoOn: false,
+            localStream: audioOnlyStreamRef.current 
+          }));
+        }
       }
+      
+      // Emit state change
+      socketRef.current?.emit('media-state-change', {
+        roomId,
+        isVideoOn: newVideoState,
+        isAudioOn: callState.isAudioOn
+      });
+      
+    } catch (error) {
+      console.error('Error toggling video:', error);
     }
-  }, [callState.localStream, roomId]);
+  }, [callState.localStream, callState.isVideoOn, callState.isAudioOn, roomId]);
 
   const toggleAudio = useCallback(() => {
     if (callState.localStream) {
@@ -548,10 +584,18 @@ const VideoCallPage: React.FC<{ roomId?: string }> = ({ roomId = 'room-123' }) =
 
   const endCall = useCallback(() => {
     callState.localStream?.getTracks().forEach(track => track.stop());
+    originalStreamRef.current?.getTracks().forEach(track => track.stop());
+    audioOnlyStreamRef.current?.getTracks().forEach(track => track.stop());
     screenShareStream.current?.getTracks().forEach(track => track.stop());
+    
     peerConnections.current.forEach(pc => pc.close());
     peerConnections.current.clear();
     socketRef.current?.disconnect();
+    
+    // Reset refs
+    originalStreamRef.current = null;
+    audioOnlyStreamRef.current = null;
+    
     setCallState(prev => ({ ...prev, callStatus: 'disconnected' }));
   }, [callState.localStream]);
 
@@ -697,9 +741,8 @@ const VideoCallPage: React.FC<{ roomId?: string }> = ({ roomId = 'room-123' }) =
       </div>
     );
   }
-
   if (!callState.roomConfirmation) {
-    return <RoomJoinConfirmation callState={callState} setCallState={setCallState} roomId={roomId} />;
+    return <RoomJoinConfirmation callState={callState} setCallState={setCallState} roomId={roomId} originalStreamRef={originalStreamRef} />;
   }
 
   return (
