@@ -1,4 +1,4 @@
-import VideoCallPage from "@/components/video-call-page";
+import SDKComponent from "@/components/call-with-sdk";
 import { use } from "react";
 
 interface PageProps {
@@ -8,6 +8,6 @@ interface PageProps {
 }
 
 export default function CallPage({ params }: PageProps) {
-  const { roomId } = use(params); // ✅ no await, no error
-  return <VideoCallPage roomId={roomId} />;
+  const { roomId } = use(params);
+  return <SDKComponent id={roomId} />;
 }
