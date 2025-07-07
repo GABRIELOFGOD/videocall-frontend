@@ -7,6 +7,9 @@ import {
 } from "@stream-io/video-react-sdk";
 import { useEffect, useState } from "react";
 import { Button } from "./ui/button";
+import { useUser } from "@/providers/UserProvider";
+import { Input } from "./ui/input";
+import { toast } from "sonner";
 
 const MeetingSetup = ({
   setIsSetUpComplete,
@@ -14,8 +17,11 @@ const MeetingSetup = ({
   setIsSetUpComplete: (value: boolean) => void;
 }) => {
   const [isMicCamToggledOn, setIsMicCamToggeledOn] = useState<boolean>(false);
+  const [username, setUsername] = useState("");
 
   const call = useCall();
+
+  const { user, isLoaded } = useUser();
 
   if (!call) throw new Error("Something went wrong while preparing your call");
 
@@ -28,6 +34,12 @@ const MeetingSetup = ({
       call?.microphone.enable();
     }
   }, [isMicCamToggledOn, call?.camera, call?.microphone]);
+
+  useEffect(() => {
+    if (isLoaded) {
+      setUsername(user?.name || "");
+    }
+  }, [isLoaded, user]);
 
   return (
     <div className="flex justify-center items-center h-screen w-full flex-col gap-3">
@@ -51,8 +63,19 @@ const MeetingSetup = ({
         </label>
         <DeviceSettings />
       </div>
+      <Input
+        value={username}
+        onChange={(e) => setUsername(e.target.value)}
+        placeholder="Username"
+        className="mx-auto w-full md:w-[400px]"
+      />
       <Button
+        disabled={!username.trim() || username === "user"}
         onClick={() => {
+          if (!username.trim() || username === "user") {
+            toast.error("Please enter your username");
+            return;
+          }
           call.join();
           setIsSetUpComplete(true);
         }}

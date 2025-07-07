@@ -2,30 +2,33 @@
 
 import { ReactNode, useState, useEffect } from "react";
 import { StreamVideo, StreamVideoClient } from "@stream-io/video-react-sdk";
-import { user } from "@/data/user";
 import { tokenProvider } from "@/actions/stream.actions";
 import Loader from "@/components/loader";
+import { useUser } from "./UserProvider";
 
 const apiKey = process.env.NEXT_PUBLIC_STREAM_API_KEY!;
 
 const StreamVideoProvider = ({ children }: { children: ReactNode }) => {
   const [videoClient, setVideoClient] = useState<StreamVideoClient>();
 
+  const { user, isLoaded } = useUser();
+
   useEffect(() => {
-    const client = new StreamVideoClient({
-      apiKey,
-      user: {
-        id: user.id,
-        name: user.username || user.id,
-        image: user.image
-      },
-      tokenProvider,
-    });
+    if (isLoaded) {
+      const client = new StreamVideoClient({
+        apiKey,
+        user: {
+          id: user!.id,
+          name: user!.name || user!.id,
+        },
+        tokenProvider: () => tokenProvider(user!),
+      });
 
-    setVideoClient(client);
-  }, [user]);
+      setVideoClient(client);
+    }
+  }, [user, isLoaded]);
 
-  if (!videoClient) {
+  if (!videoClient || !isLoaded) {
     return <Loader />
   }
   

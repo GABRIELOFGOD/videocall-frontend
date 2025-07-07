@@ -1,9 +1,11 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { BASEURL } from '@/utils/constants';
+import { toast } from 'sonner';
+import { useUser } from '@/providers/UserProvider';
 
 interface RegisterFormData {
   name: string;
@@ -34,6 +36,8 @@ export default function RegisterPage() {
   const [isLoading, setIsLoading] = useState(false);
   const [apiError, setApiError] = useState('');
   const router = useRouter();
+
+  const { user, isLoaded } = useUser();
 
   const validateForm = (): boolean => {
     const newErrors: Partial<RegisterFormData> = {};
@@ -71,7 +75,7 @@ export default function RegisterPage() {
     setIsLoading(true);
 
     try {
-      const response = await fetch(`${BASEURL}/auth/register`, {
+      const response = await fetch(`${BASEURL}/api/auth/register`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -87,15 +91,11 @@ export default function RegisterPage() {
       // const data: ApiResponse = await response.json()
 
       if (!response.ok) {
-        throw new Error(data.detail || 'Registration failed');
+        throw new Error(data.message || 'Registration failed');
       }
-
-      // Store token in localStorage
-      localStorage.setItem('token', data.access_token);
-      localStorage.setItem('user', JSON.stringify(data.user));
-
+      toast.success(data.message)
       console.log("DATA ", data);
-      router.push('/');
+      router.push('/login');
     } catch (error) {
       setApiError(error instanceof Error ? error.message : 'Registration failed');
     } finally {
@@ -110,6 +110,12 @@ export default function RegisterPage() {
       setErrors(prev => ({ ...prev, [name]: undefined }));
     }
   };
+
+  useEffect(() => {
+      if (isLoaded && user !== null){
+        router.push("/");
+      }
+    }, [isLoaded, user]);
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-gray-50 py-12 px-4 sm:px-6 lg:px-8">

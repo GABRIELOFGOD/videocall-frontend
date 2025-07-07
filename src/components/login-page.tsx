@@ -1,9 +1,12 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { BASEURL } from '@/utils/constants';
+import { toast } from 'sonner';
+import { isError } from '@/utils/helper';
+import { useUser } from '@/providers/UserProvider';
 
 interface LoginFormData {
   email: string;
@@ -31,6 +34,8 @@ export default function LoginPage() {
   const [apiError, setApiError] = useState('');
   const router = useRouter();
 
+  const { user, isLoaded } = useUser();
+
   const validateForm = (): boolean => {
     const newErrors: Partial<LoginFormData> = {};
 
@@ -57,7 +62,7 @@ export default function LoginPage() {
     setIsLoading(true);
 
     try {
-      const response = await fetch(`${BASEURL}/auth/login`, {
+      const response = await fetch(`${BASEURL}/api/auth/login`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -69,20 +74,23 @@ export default function LoginPage() {
       });
 
       const data = await response.json();
-      // const data: ApiResponse = await response.json();
-
+      console.log("[DATA]: ", data);
       if (!response.ok) {
-        throw new Error(data.detail || 'Login failed');
+        throw new Error(data.error.message);
       }
 
       // Store token in localStorage
-      localStorage.setItem('token', data.access_token);
-      localStorage.setItem('user', JSON.stringify(data.user));
-
-      // Redirect to dashboard
-      router.push('/');
-    } catch (error) {
-      setApiError(error instanceof Error ? error.message : 'Login failed');
+      localStorage.setItem('token', data.token);
+      toast.success(data.message);
+      location.assign("/");
+    } catch (error: unknown) {
+      if (isError(error)) {
+        console.error("Login failed", error);
+        toast.error(error.message);
+        setApiError(error.message);
+      } else {
+        console.error("Unknown error", error);
+      }
     } finally {
       setIsLoading(false);
     }
@@ -95,6 +103,12 @@ export default function LoginPage() {
       setErrors(prev => ({ ...prev, [name]: undefined }));
     }
   };
+
+  useEffect(() => {
+    if (isLoaded && user !== null){
+      router.push("/");
+    }
+  }, [isLoaded, user]);
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-gray-50 py-12 px-4 sm:px-6 lg:px-8">

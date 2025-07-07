@@ -1,9 +1,10 @@
 import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
-import StreamVideoProvider from "@/providers/StreamClientProvider";
 import { Toaster } from "@/components/ui/sonner";
 import "@stream-io/video-react-sdk/dist/css/styles.css";
 import "./globals.css";
+import UserProvider from "@/providers/UserProvider";
+import StreamVideoProvider from "@/providers/StreamClientProvider";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -30,10 +31,12 @@ export default function RootLayout({
       <body
         className={`${geistSans.variable} ${geistMono.variable} antialiased bg-gray-100`}
       >
-        <StreamVideoProvider>
-          <Toaster position="top-right" />
-          {children}
-        </StreamVideoProvider>
+        <UserProvider>
+          <StreamVideoProvider>
+            <Toaster position="top-right" />
+            {children}
+          </StreamVideoProvider>
+        </UserProvider>
       </body>
     </html>
   );

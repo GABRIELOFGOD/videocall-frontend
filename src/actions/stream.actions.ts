@@ -2,10 +2,10 @@
 
 const apiKey = process.env.NEXT_PUBLIC_STREAM_API_KEY;
 const apiSecret = process.env.STREAM_SECRET_KEY;
-import { user } from "@/data/user";
+import { User } from "@/providers/UserProvider";
 import { StreamClient } from "@stream-io/node-sdk"
 
-export const tokenProvider = async () => {
+export const tokenProvider = async (user: User) => {
 
   if (!user) throw new Error("User not logged In");
   if (!apiKey) throw new Error("API key not found");
