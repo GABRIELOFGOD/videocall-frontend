@@ -10,7 +10,7 @@ import {
   SpeakerLayout,
   useCallStateHooks,
 } from "@stream-io/video-react-sdk";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 
 import {
   DropdownMenu,
@@ -35,6 +35,12 @@ const MeetingRoom = () => {
   const { useCallCallingState } = useCallStateHooks();
 
   const callingState = useCallCallingState();
+
+  useEffect(() => {
+    if (callingState === CallingState.LEFT) {
+      location.assign("/")
+    }
+  }, [callingState]);
 
   if (callingState !== CallingState.JOINED) return <Loader />
 

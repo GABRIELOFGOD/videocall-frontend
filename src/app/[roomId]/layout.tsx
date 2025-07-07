@@ -1,9 +1,12 @@
 import { ReactNode } from "react";
+import StreamVideoProvider from "@/providers/StreamClientProvider";
 
 const CallRoomLayout = ({ children }: { children: ReactNode }) => {
   return (
     <div>
-      {children}
+      <StreamVideoProvider>
+        {children}
+      </StreamVideoProvider>
     </div>
   )
 }

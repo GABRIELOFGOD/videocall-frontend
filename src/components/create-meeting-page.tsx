@@ -1,78 +1,5 @@
 "use client";
 
-// import { useEffect, useState } from "react";
-// import { Button } from "./ui/button";
-// import { useRouter } from "next/navigation";
-// import { user } from "@/data/user";
-// import { Call, useStreamVideoClient } from "@stream-io/video-react-sdk";
-// import { generateMeetId } from "@/lib/helper";
-// import { toast } from "sonner";
-
-// const CreateMeetingPage = () => {
-//   const [values, setValues] = useState({
-//     dateTime: new Date(),
-//     description: "",
-//     link: ""
-//   });
-//   const [callDetails, setCallDetails] = useState<Call>();
-
-//   const router = useRouter();
-
-//   const client = useStreamVideoClient();
-
-//   useEffect(() => {
-//     setValues({
-//       dateTime: new Date(),
-//       description: "",
-//       link: ""
-//     });
-//   }, []);
-
-//   console.log("callDetails", callDetails);
-//   const createMeeting = async () => {
-//     if (!user || !client) return;
-//     try {
-//       const id = generateMeetId();
-//       const call = client.call("default", id);
-
-//       if (!call) throw new Error("Failed to create call");
-
-//       const startsAt = values.dateTime.toISOString() || new Date(Date.now()).toISOString();
-//       const description = values.description || "Start instant meeting";
-
-//       await call.getOrCreate({
-//         data: {
-//           starts_at: startsAt,
-//           custom: {
-//             description
-//           }
-//         }
-//       });
-
-//       setCallDetails(call);
-//       if (!values.description) {
-//         router.push(`/${call.id}`);
-//       }
-
-//       toast.success("Meeting created");
-//     } catch (error) {
-//       console.log(error);
-//     }
-//   }
-
-//   return (
-//     <div className="w-[350px] mx-auto flex justify-center items-center h-fit p-4 bg-white gap-2 flex-col">
-//       <Button
-//         onClick={createMeeting}
-//         className="w-full"
-//       >
-//         Join meeting
-//       </Button>
-//     </div>
-//   )
-// }
-// export default CreateMeetingPage;
-
 import React, { useState } from "react";
 import { Button } from "@/components/ui/button";
 import {
@@ -107,8 +34,7 @@ import {
 } from "@/components/ui/dialog";
 import { isError } from "@/utils/helper";
 
-import { User, useUser } from "@/providers/UserProvider";
-import { useStreamVideoClient } from "@stream-io/video-react-sdk";
+import { useUser } from "@/providers/UserProvider";
 import { toast } from "sonner";
 import { generateMeetId } from "@/lib/helper";
 import { useRouter } from "next/navigation";
@@ -116,7 +42,6 @@ import { BASEURL } from "@/utils/constants";
 
 const CreateMeetingPage = () => {
   const [meetingId, setMeetingId] = React.useState("");
-  const [username, setUsername] = useState("");
   const { user, isLoaded } = useUser();
 
   const router = useRouter();
@@ -126,10 +51,8 @@ const CreateMeetingPage = () => {
 
   const [creatingMeeting, setCreatingMeeting] = useState(false);
 
-  const client = useStreamVideoClient();
-
   const handleCreateMeeting = async () => {
-    if ((isLoaded && !user) || !client) {
+    if (isLoaded && !user) {
       toast.error(
         "Something went wrong, please check your connection and reload"
       );
@@ -162,22 +85,22 @@ const CreateMeetingPage = () => {
         throw new Error(res.error.message || "Failed to create meeting");
       if (!res.success)
         throw new Error(res.error.message || "Failed to create meeting");
-      const call = client.call("default", id);
+      // const call = client.call("default", id);
 
-      if (!call) throw new Error("Failed to create call");
+      // if (!call) throw new Error("Failed to create call");
 
-      const startsAt = new Date(Date.now()).toISOString();
+      // const startsAt = new Date(Date.now()).toISOString();
 
-      await call.getOrCreate({
-        data: {
-          starts_at: startsAt,
-          custom: {
-            meetingTitle,
-          },
-        },
-      });
+      // await call.getOrCreate({
+      //   data: {
+      //     starts_at: startsAt,
+      //     custom: {
+      //       meetingTitle,
+      //     },
+      //   },
+      // });
 
-      router.push(`/${call.id}`);
+      location.assign(`/${id}`);
       toast.success("Meeting created");
     } catch (error: unknown) {
       if (isError(error)) {
@@ -191,23 +114,15 @@ const CreateMeetingPage = () => {
     }
   };
 
+  const gotoLogin = () => {
+    router.push("/login")
+  }
+
   const handleJoinMeeting = () => {
-    let storableUser: User;
-    if (user) {
-      storableUser = user;
-    } else {
-      if (username) {
-        toast.error("Username is required to join meeting");
-        return;
-      }
-      storableUser = {
-        id: crypto.randomUUID(),
-        name: username,
-        email: `${username}@email.com`,
-      };
+    if (!meetingId.trim()) {
+      toast.error("Meeting ID is required");
+      return;
     }
-    const stringed = JSON.stringify(storableUser);
-    localStorage.setItem("user", stringed);
     router.push(`/${meetingId}`);
   };
 
@@ -272,7 +187,7 @@ const CreateMeetingPage = () => {
               <Dialog>
                 <DialogTrigger className="w-full">
                   <Button
-                    disabled={!user || user.name === "user"}
+                    disabled={!user}
                     className="w-full bg-gradient-to-r from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700 text-white font-semibold py-6 text-lg group-hover:shadow-lg transition-all duration-300"
                   >
                     <PlayCircle className="w-5 h-5 mr-2" />
@@ -300,7 +215,7 @@ const CreateMeetingPage = () => {
                         <Button
                           onClick={handleCreateMeeting}
                           size={"lg"}
-                          disabled={!meetingTitle.trim() && creatingMeeting}
+                          disabled={!meetingTitle.trim() || creatingMeeting}
                         >
                           {creatingMeeting ? (
                             <div className="flex gap-2">
@@ -322,6 +237,7 @@ const CreateMeetingPage = () => {
                 </DialogContent>
               </Dialog>
             </CardContent>
+            {!user && <p className="text-sm font-semibold text-center mt-2 cursor-pointer"><span className="text-blue-500 font-bold hover:underline" onClick={gotoLogin}>Login</span> to create meeting</p>}
           </Card>
 
           {/* Join Meeting */}
@@ -344,50 +260,15 @@ const CreateMeetingPage = () => {
                 onChange={(e) => setMeetingId(e.target.value)}
                 className="border-emerald-200 dark:border-emerald-800 focus:ring-emerald-500 focus:border-emerald-500 py-6 text-lg"
               />
-
-              <Dialog>
-                <DialogTrigger className="w-full">
-                  <Button
-                    onClick={() => {
-                      if (!meetingId.trim()) {
-                        toast.error("Enter meeting ID");
-                        return;
-                      }
-                      if (user) {
-                        setUsername(user.name);
-                      }
-                    }}
-                    className="w-full bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-600 hover:to-teal-700 text-white font-semibold py-6 text-lg group-hover:shadow-lg transition-all duration-300"
-                    disabled={!meetingId.trim()}
-                  >
-                    <Users className="w-5 h-5 mr-2" />
-                    Join Meeting
-                    <ChevronRight className="w-4 h-4 ml-2 group-hover:translate-x-1 transition-transform" />
-                  </Button>
-                </DialogTrigger>
-                <DialogContent>
-                  <DialogHeader>
-                    <DialogTitle>Join meeting {meetingId}</DialogTitle>
-                    <DialogDescription>
-                      <div className="flex flex-col gap-3 mt-3">
-                        <Input
-                          className="w-full"
-                          placeholder="Please enter your name"
-                          value={username}
-                          onChange={(e) => setUsername(e.target.value)}
-                        />
-                        <Button
-                          onClick={handleJoinMeeting}
-                          size={"lg"}
-                          disabled={!username.trim()}
-                        >
-                          Join meeting
-                        </Button>
-                      </div>
-                    </DialogDescription>
-                  </DialogHeader>
-                </DialogContent>
-              </Dialog>
+              <Button
+                onClick={handleJoinMeeting}
+                className="w-full bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-600 hover:to-teal-700 text-white font-semibold py-6 text-lg group-hover:shadow-lg transition-all duration-300"
+                disabled={!meetingId.trim()}
+              >
+                <Users className="w-5 h-5 mr-2" />
+                Join Meeting
+                <ChevronRight className="w-4 h-4 ml-2 group-hover:translate-x-1 transition-transform" />
+              </Button>
             </CardContent>
           </Card>
 

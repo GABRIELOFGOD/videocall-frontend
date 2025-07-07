@@ -53,16 +53,6 @@ const UserProvider = ({ children }: { children: ReactNode }) => {
       } else {
         console.error("Unknown error", error);
       }
-      const userFromLocalStorage = localStorage.getItem("user");
-      if (userFromLocalStorage) {
-        setUser(JSON.parse(userFromLocalStorage));
-      } else {
-        setUser({
-          id: crypto.randomUUID(),
-          email: "email@mail.com",
-          name: "user"
-        });
-      }
     } finally {
       setIsLoaded(true);
       console.log("LOADED");
