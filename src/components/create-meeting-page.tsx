@@ -195,7 +195,7 @@ const CreateMeetingPage = () => {
                     <ChevronRight className="w-4 h-4 ml-2 group-hover:translate-x-1 transition-transform" />
                   </Button>
                 </DialogTrigger>
-                <DialogContent>
+                {user && <DialogContent>
                   <DialogHeader>
                     <DialogTitle>Create a new meeting link</DialogTitle>
                     <DialogDescription>
@@ -234,7 +234,7 @@ const CreateMeetingPage = () => {
                       </div>
                     </DialogDescription>
                   </DialogHeader>
-                </DialogContent>
+                </DialogContent>}
               </Dialog>
             </CardContent>
             {!user && <p className="text-sm font-semibold text-center mt-2 cursor-pointer"><span className="text-blue-500 font-bold hover:underline" onClick={gotoLogin}>Login</span> to create meeting</p>}
