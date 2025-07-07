@@ -100,7 +100,7 @@ const CreateMeetingPage = () => {
       //   },
       // });
 
-      location.assign(`/${id}`);
+      router.push(`/${id}`);
       toast.success("Meeting created");
     } catch (error: unknown) {
       if (isError(error)) {
