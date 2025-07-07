@@ -272,7 +272,7 @@ const CreateMeetingPage = () => {
               <Dialog>
                 <DialogTrigger className="w-full">
                   <Button
-                    disabled={!user}
+                    disabled={!user || user.name === "user"}
                     className="w-full bg-gradient-to-r from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700 text-white font-semibold py-6 text-lg group-hover:shadow-lg transition-all duration-300"
                   >
                     <PlayCircle className="w-5 h-5 mr-2" />
