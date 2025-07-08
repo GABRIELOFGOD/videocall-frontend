@@ -11,10 +11,12 @@ import { BASEURL } from "@/utils/constants";
 import { toast } from "sonner";
 import { useRouter } from "next/navigation";
 import { useUser } from "@/providers/UserProvider";
+import { Meet } from "@/types/meeting";
 
 const SDKComponent = ({ id }: { id: string }) => {
   const [isSetUpComplete, setIsSetUpComplete] = useState<boolean>(false);
   const [validatingCall, setValidating] = useState(true);
+  const [meeting, setMeeting] = useState<Meet | null>(null);
   const router = useRouter();
 
   const client = useStreamVideoClient();
@@ -28,7 +30,7 @@ const SDKComponent = ({ id }: { id: string }) => {
       const req = await fetch(`${BASEURL}/api/meet/${id}`);
       const res = await req.json();
       if (!req.ok) throw new Error(res.error.message || "Cannot find meeting");
-      console.log("[MEETIING RESPONSE]: ", res);
+      setMeeting(res);
       if (!client) {
         throw new Error("No call client found!");
       }
@@ -78,7 +80,7 @@ const SDKComponent = ({ id }: { id: string }) => {
           <MeetingSetup
             setIsSetUpComplete={setIsSetUpComplete}
           /> :
-          <MeetingRoom />}
+          <MeetingRoom meeting={meeting} />}
         </StreamTheme>
       </StreamCall>
     </div>
