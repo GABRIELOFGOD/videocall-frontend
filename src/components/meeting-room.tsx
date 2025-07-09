@@ -2,40 +2,35 @@
 
 import { cn } from "@/lib/utils";
 import {
-  CallControls,
+  // CallControls,
   CallingState,
   CallParticipantsList,
   CallStatsButton,
   SpeakerLayout,
   useCall,
   useCallStateHooks,
+  OwnCapability,
+  ToggleAudioPublishingButton,
+  ToggleVideoPublishingButton,
+  CancelCallConfirmButton,
+  CancelCallButton,
+  ScreenShareButton,
+  RecordCallConfirmationButton
 } from "@stream-io/video-react-sdk";
 import { useEffect, useState } from "react";
-import { Users } from "lucide-react";
+import { MicOff, Users } from "lucide-react";
 import { useSearchParams } from "next/navigation";
-import EndCallButton from "./ui/end-call-button";
+// import EndCallButton from "./ui/end-call-button";
 import Loader from "./loader";
 import { Meet } from "@/types/meeting";
 import { Input } from "./ui/input";
-
-// Hook to detect if user is on mobile
-const useIsMobile = () => {
-  const [isMobile, setIsMobile] = useState(false);
-  useEffect(() => {
-    const check = () => setIsMobile(window.innerWidth < 768);
-    check();
-    window.addEventListener("resize", check);
-    return () => window.removeEventListener("resize", check);
-  }, []);
-  return isMobile;
-};
+import { toast } from "sonner";
 
 const MeetingRoom = ({ meeting }: { meeting: Meet | null }) => {
   const [showParticipants, setShowParticipants] = useState(false);
   const searchParams = useSearchParams();
   const isPersonalRoom = !!searchParams.get("personal");
   const [showControl, setShowControl] = useState<boolean>(false);
-  const isMobile = useIsMobile();
 
   const { useCallCallingState, useLocalParticipant } =
     useCallStateHooks();
@@ -50,14 +45,6 @@ const MeetingRoom = ({ meeting }: { meeting: Meet | null }) => {
     }
   }, [callingState]);
 
-  useEffect(() => {
-    if (!isMobile) {
-      setShowParticipants(true);
-    } else {
-      setShowParticipants(false);
-    }
-  }, [isMobile]);
-
   if (callingState !== CallingState.JOINED) return <Loader />;
 
   // Recording toggle (admin only)
@@ -69,31 +56,30 @@ const MeetingRoom = ({ meeting }: { meeting: Meet | null }) => {
 
   const isMeetingOwner = localParticipant && call?.state.createdBy && localParticipant.userId === call.state.createdBy.id;
 
-  // const handleMuteAll = async () => {
-  //   if (!call) return;
-  //   if (!isMeetingOwner) return;
-  //   const otherParticipants = call.state.participants.filter(
-  //     (participant) => participant.userId !== localParticipant.userId
-  //   );
-  //   otherParticipants.forEach((participant) => {
-  //     // participant.audioStream?.addEventListener("removetrack", () => {
-  //     //   participant.audioStream?.getTracks().forEach((track) => {
-  //     //     track.enabled = false;
-  //     //   });
-  //     // });
-  //     participant.audioStream?.getTracks().forEach((track) => {
-  //       track.enabled = false;
-  //     });
-  //   });
-  //   await call.sendCustomEvent({
-  //     type: "mute-all",
-  //     data: {},
-  //   });
-  // };
+  const handleMuteAll = async () => {
+    if (!call || !isMeetingOwner) return;
+
+    const participants = call.state.participants.filter(
+      (pert) => pert.userId !== call?.state.createdBy?.id
+    );
+
+    for (const participant of participants) {
+      try {
+        await call.updateUserPermissions({
+          user_id: participant.userId,
+          revoke_permissions: [OwnCapability.SEND_AUDIO]
+        });
+      } catch (err) {
+        toast.error("Failed to mute some participants. Please try again.");
+        console.error(`Failed to mute ${participant.userId}:`, err);
+      }
+    }
+    toast.success("All participants have been muted.");
+  };
 
   return (
     <div className="flex h-screen overflow-hidden w-full">
-      <section className="relative h-full w-full overflow-hidden bg-[#0D1B2A] text-white px-3 md:px-5 py-10">
+      <section className="relative h-full w-full overflow-hidden bg-[#0D1B2A] text-white px-3 md:px-5 py-5">
         <div className="flex md:justify-between items-center w-full flex-col md:flex-row justify-start gap-4 relative">
           <div className="text-start w-full md:w-fit">
             <h1 className="text-2xl font-bold">{meeting?.title}</h1>
@@ -118,7 +104,9 @@ const MeetingRoom = ({ meeting }: { meeting: Meet | null }) => {
 
         {/* CONTROLS */}
         <div className={cn("fixed duration-200 ease-in-out flex w-full items-center justify-center gap-3 flex-wrap p-2 bg-[#0D1B2A]/60 backdrop-blur-sm z-40", showControl ? "translate-y-0 bottom-0" : "translate-y-full -bottom-10")}>
-          <CallControls />
+          {/* <CallControls /> */}
+          <ToggleAudioPublishingButton />
+          <ToggleVideoPublishingButton />
 
           {/* Admin-only buttons */}
           {!isPersonalRoom && isMeetingOwner && (
@@ -129,17 +117,20 @@ const MeetingRoom = ({ meeting }: { meeting: Meet | null }) => {
               >
                 <Aperture size={18} />
                 {isRecording ? "Stop Recording" : "Start Recording"}
-              </button>
+              </button> */}
+
+              <ScreenShareButton />
+
+              <RecordCallConfirmationButton />
+
+              <CallStatsButton />
 
               <button
                 onClick={handleMuteAll}
-                className="flex items-center gap-1 rounded bg-yellow-500 px-3 py-2 text-sm hover:bg-yellow-600"
+                className="rounded bg-white/10 p-2 hover:bg-white/20"
               >
                 <MicOff size={18} />
-                Mute All
-              </button> */}
-
-              <CallStatsButton />
+              </button>
             </>
           )}
 
@@ -151,8 +142,14 @@ const MeetingRoom = ({ meeting }: { meeting: Meet | null }) => {
             <Users size={20} />
           </button>
 
+          {!isPersonalRoom && isMeetingOwner ? (
+            <CancelCallConfirmButton />
+          ) : (
+            <CancelCallButton />
+          )}
+
           {/* End Call Button for participants */}
-          {!isPersonalRoom && <EndCallButton />}
+          {/* {!isPersonalRoom && <EndCallButton />} */}
         </div>
         
         <div className={cn("absolute duration-200 ease-in-out right-10 z-50", showControl ? "bottom-20" : "bottom-5")}>
