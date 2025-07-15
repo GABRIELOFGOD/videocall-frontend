@@ -4,7 +4,7 @@ import { cn } from "@/lib/utils";
 import {
   // CallControls,
   CallingState,
-  CallParticipantsList,
+  // CallParticipantsList,
   CallStatsButton,
   SpeakerLayout,
   useCall,
@@ -15,7 +15,10 @@ import {
   CancelCallConfirmButton,
   CancelCallButton,
   ScreenShareButton,
-  RecordCallConfirmationButton
+  RecordCallConfirmationButton,
+  SpeakingWhileMutedNotification,
+  ReactionsButton,
+  CallParticipantsList
 } from "@stream-io/video-react-sdk";
 import { useEffect, useState } from "react";
 import { MicOff, Users } from "lucide-react";
@@ -25,6 +28,7 @@ import Loader from "./loader";
 import { Meet } from "@/types/meeting";
 import { Input } from "./ui/input";
 import { toast } from "sonner";
+// import CallParticipant from "./call-participant-card";
 
 const MeetingRoom = ({ meeting }: { meeting: Meet | null }) => {
   const [showParticipants, setShowParticipants] = useState(false);
@@ -36,6 +40,9 @@ const MeetingRoom = ({ meeting }: { meeting: Meet | null }) => {
     useCallStateHooks();
   const callingState = useCallCallingState();
   const localParticipant = useLocalParticipant();
+
+  // const participants = useParticipants();
+  // const participantCount = useParticipantCount();
 
   const call = useCall();
 
@@ -80,13 +87,12 @@ const MeetingRoom = ({ meeting }: { meeting: Meet | null }) => {
   return (
     <div className="flex h-screen overflow-hidden w-full">
       <section className="relative h-full w-full overflow-hidden bg-[#0D1B2A] text-white px-3 md:px-5 py-5">
-        <div className="flex md:justify-between items-center w-full flex-col md:flex-row justify-start gap-4 relative">
+        {showControl && !showParticipants && <div className="flex md:justify-between items-center w-full flex-col md:flex-row justify-start gap-4 relative md:px-[100px]">
           <div className="text-start w-full md:w-fit">
             <h1 className="text-2xl font-bold">{meeting?.title}</h1>
-            <p className="font-medium text-xs text-gray-300">{meeting?.description}</p>
           </div>
-          <div className="my-auto w-full md:w-fit hidden md:flex flex-col items-start gap-2">
-            <p className="font-bold">Meeting Link</p>
+          <div className="my-auto w-full md:w-fit hidden md:flex flex-row items-start gap-2">
+            <p className="font-bold my-auto">Meeting Link</p>
             <Input
               value={`${window.location.origin}/${meeting?.meetingId}`}
               disabled
@@ -94,9 +100,9 @@ const MeetingRoom = ({ meeting }: { meeting: Meet | null }) => {
             />
           </div>
 
-        </div>
+        </div>}
         <div className="relative flex items-center h-full justify-center">
-          <div className="flex size-full h-full justify-center items-center max-w-[1100px]">
+          <div className={cn("flex size-full h-full justify-center items-center ", showControl ? "mb-22 max-w-[1000px]" : "mb-5 max-w-[1100px]", showParticipants && "mb-[550px] md:mb-5")}>
             <SpeakerLayout participantsBarPosition={null} />
           </div>  
           
@@ -105,8 +111,11 @@ const MeetingRoom = ({ meeting }: { meeting: Meet | null }) => {
         {/* CONTROLS */}
         <div className={cn("fixed duration-200 ease-in-out flex w-full items-center justify-center gap-3 flex-wrap p-2 bg-[#0D1B2A]/60 backdrop-blur-sm z-40", showControl ? "translate-y-0 bottom-0" : "translate-y-full -bottom-10")}>
           {/* <CallControls /> */}
-          <ToggleAudioPublishingButton />
+          <SpeakingWhileMutedNotification placement="top-end" >
+            <ToggleAudioPublishingButton />
+          </SpeakingWhileMutedNotification>
           <ToggleVideoPublishingButton />
+          <ReactionsButton />
 
           {/* Admin-only buttons */}
           {!isPersonalRoom && isMeetingOwner && (
@@ -152,7 +161,7 @@ const MeetingRoom = ({ meeting }: { meeting: Meet | null }) => {
           {/* {!isPersonalRoom && <EndCallButton />} */}
         </div>
         
-        <div className={cn("absolute duration-200 ease-in-out right-10 z-50", showControl ? "bottom-20" : "bottom-5")}>
+        <div className={cn("absolute duration-200 ease-in-out right-10 z-50", showControl ? "bottom-28" : "bottom-5")}>
           {showControl ? (
             <button
               onClick={() => setShowControl(false)}
@@ -170,12 +179,23 @@ const MeetingRoom = ({ meeting }: { meeting: Meet | null }) => {
           )}
         </div>
       </section>
-      <div>
+      <div className="w-fit h-full overflow-hidden">
         {/* PARTICIPANT LIST */}
+        {/* <div
+          className={cn("text-[#0D1B2A] p-3 bg-white overflow-y-auto rounded-md absolute right-0 duration-300 ease-in-out w-full md:w-fit h-[500px]", showParticipants ? "bottom-28" : "bottom-[-100%]")}
+        >
+          <div className="py-2 px-4 flex gap-5">
+            participants ({participantCount})
+          </div>
+          {participants.map((particip, i) => (
+            <CallParticipant
+              key={i}
+              participant={particip}
+            />
+          ))}
+        </div> */}
         {showParticipants && (
-          <div
-            className={cn("text-[#0D1B2A] p-3 h-screen bg-white overflow-y-auto rounded-md")}
-          >
+          <div className="p-3">
             <CallParticipantsList onClose={() => setShowParticipants(false)} />
           </div>
         )}
