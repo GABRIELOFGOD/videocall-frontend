@@ -138,11 +138,11 @@ const CreateMeetingPage = () => {
         <div className="container mx-auto px-4 py-4">
           <div className="flex items-center justify-between">
             <div className="flex items-center space-x-2">
-              <div className="flex items-center justify-center w-10 h-10 bg-gradient-to-br from-blue-500 to-purple-600 rounded-xl">
+              {/* <div className="flex items-center justify-center w-10 h-10 bg-gradient-to-br from-blue-500 to-purple-600 rounded-xl">
                 <Video className="w-5 h-5 text-white" />
-              </div>
+              </div> */}
               <span className="text-xl font-bold bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">
-                Coinconnect MeetSpace
+                TeleBit Meet
               </span>
             </div>
             <Badge
@@ -150,7 +150,7 @@ const CreateMeetingPage = () => {
               className="bg-blue-50 text-blue-700 border-blue-200"
             >
               <Sparkles className="w-3 h-3 mr-1" />
-              Beta
+              Community version
             </Badge>
           </div>
         </div>
