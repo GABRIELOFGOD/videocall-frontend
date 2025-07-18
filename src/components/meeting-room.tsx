@@ -18,11 +18,12 @@ import {
   RecordCallConfirmationButton,
   SpeakingWhileMutedNotification,
   ReactionsButton,
-  CallParticipantsList,
-  CustomVideoEvent
+  // CallParticipantsList,
+  CustomVideoEvent,
+  StreamVideoParticipant
 } from "@stream-io/video-react-sdk";
 import { useEffect, useState } from "react";
-import { MicOff, UserPlus, Users, X } from "lucide-react";
+import { Hand, MicOff, UserPlus, Users, X } from "lucide-react";
 import { useSearchParams } from "next/navigation";
 // import EndCallButton from "./ui/end-call-button";
 import Loader from "./loader";
@@ -30,6 +31,8 @@ import { Meet } from "@/types/meeting";
 // import { Input } from "./ui/input";
 import { toast } from "sonner";
 import { Button } from "./ui/button";
+import CallParticipant from "./call-participant-card";
+import { useUser } from "@/providers/UserProvider";
 // import CallParticipant from "./call-participant-card";
 
 const MeetingRoom = ({ meeting }: { meeting: Meet | null }) => {
@@ -41,15 +44,19 @@ const MeetingRoom = ({ meeting }: { meeting: Meet | null }) => {
   const [receivedJoinRequest, setReceivedJoinRequest] = useState<boolean>(false);
   const [joinRequesters, setJoinRequesters] = useState<{name: string; id: string;}[]>([]);
 
-  const { useCallCallingState, useLocalParticipant } =
+  const [handRaisers, setHandRaisers] = useState<StreamVideoParticipant[]>([]);
+
+  const { useCallCallingState, useLocalParticipant, useParticipants, useParticipantCount } =
     useCallStateHooks();
   const callingState = useCallCallingState();
   const localParticipant = useLocalParticipant();
 
-  // const participants = useParticipants();
-  // const participantCount = useParticipantCount();
+  const participants = useParticipants();
+  const participantCount = useParticipantCount();
 
   const call = useCall();
+
+  const { user } = useUser();
 
   useEffect(() => {
     if (callingState === CallingState.LEFT) {
@@ -72,6 +79,25 @@ const MeetingRoom = ({ meeting }: { meeting: Meet | null }) => {
           }
         })
       }
+      call.on("custom", (event: CustomVideoEvent) => {
+        const payload = event.custom;
+        if (payload.type === "raise_hand") {
+            setHandRaisers((prev) => {
+              // Only add if not already present
+              if (!prev.some(hr => hr.userId === payload.user.userId)) {
+                return [...prev, payload.user];
+              }
+              return prev;
+            });
+        }
+      });
+
+      call.on("custom", (event: CustomVideoEvent) => {
+        const payload = event.custom;
+        if (payload.type === "drop_hand") {
+          setHandRaisers((prev) => prev.filter(hr => hr.userId !== payload.user.userId));
+        }
+      });
     }
   }, [call]);
 
@@ -137,6 +163,38 @@ const MeetingRoom = ({ meeting }: { meeting: Meet | null }) => {
     }
   }
 
+  // const moveHandRaiserUp = () => {}
+
+  const raiseHand = async () => {
+    if (!call) return;
+    try {
+      call.sendCustomEvent({
+        type: "raise_hand",
+        user: {
+          name: user?.name,
+          userId: call.currentUserId
+        }
+      });
+    } catch (error) {
+      console.log("error raising hand", error);
+    }
+  }
+
+  const dropHand = async () => {
+    if (!call) return;
+    try {
+      call.sendCustomEvent({
+        type: "drop_hand",
+        user: {
+          name: user?.name,
+          userId: call.currentUserId
+        }
+      });
+    } catch (error) {
+      console.log("error raising hand", error);
+    }
+  }
+
   return (
     <div className="flex h-screen overflow-hidden w-full">
       <section className="relative h-full w-full overflow-hidden bg-[#0D1B2A] text-white px-3 md:px-5 py-5">
@@ -155,7 +213,12 @@ const MeetingRoom = ({ meeting }: { meeting: Meet | null }) => {
 
         </div>}
         <div className="relative flex items-center h-full justify-center">
-          <div className={cn("flex size-full h-full justify-center items-center ", showControl ? "mb-22 max-w-[1000px]" : "mb-5 max-w-[1100px]", showParticipants && "mb-[550px] md:mb-5")}>
+          <div className={cn("flex size-full h-fit justify-center items-center relative", showControl ? "mb-22 max-w-[1000px]" : "mb-5 max-w-[1100px]", showParticipants && "mb-[550px] md:mb-5")}>
+            {handRaisers.length > 0 && (<div className="absolute top-5 right-5 z-40">
+              <div className="bg-blue-500 rounded-md h-12 w-12 flex justify-center items-center text-white">
+                <Hand size={35} />
+              </div>
+            </div>)}
             <SpeakerLayout participantsBarPosition={null} />
           </div>  
           
@@ -196,7 +259,7 @@ const MeetingRoom = ({ meeting }: { meeting: Meet | null }) => {
 
               <div className="h-fit w-fit relative">
                 <button
-                  onClick={() => setShowParticipants((prev) => !prev)}
+                  // onClick={() => setShowParticipants((prev) => !prev)}
                   className="rounded bg-white/10 p-2 hover:bg-white/20"
                 >
                   <UserPlus size={20} />
@@ -214,6 +277,12 @@ const MeetingRoom = ({ meeting }: { meeting: Meet | null }) => {
             className="rounded bg-white/10 p-2 hover:bg-white/20"
           >
             <Users size={20} />
+          </button>
+          <button
+            onClick={handRaisers.some(hr => hr.userId === call?.currentUserId) ? dropHand : raiseHand}
+            className={cn("rounded p-2", handRaisers.some(hr => hr.userId === call?.currentUserId) ? "bg-blue-500 hover:bg-blue-600" : "bg-white/10 hover:bg-white/20")}
+          >
+            <Hand size={20} />
           </button>
 
           {!isPersonalRoom && isMeetingOwner ? (
@@ -246,24 +315,46 @@ const MeetingRoom = ({ meeting }: { meeting: Meet | null }) => {
       </section>
       <div className="w-fit h-full overflow-hidden">
         {/* PARTICIPANT LIST */}
-        {/* <div
-          className={cn("text-[#0D1B2A] p-3 bg-white overflow-y-auto rounded-md absolute right-0 duration-300 ease-in-out w-full md:w-fit h-[500px]", showParticipants ? "bottom-28" : "bottom-[-100%]")}
+        <div
+          className={cn("text-[#0D1B2A] p-3 bg-white overflow-y-auto rounded-md absolute right-0 duration-300 ease-in-out z-[45] w-full md:w-[300px] bottom-0", showParticipants ? "h-[500px] md:h-screen" : "h-0 p-0")}
         >
-          <div className="py-2 px-4 flex gap-5">
-            participants ({participantCount})
+          <div className="py-2 px-4 flex gap-5 font-bold w-full border-b-2 border-border">
+            Participants ({participantCount})
           </div>
-          {participants.map((particip, i) => (
-            <CallParticipant
-              key={i}
-              participant={particip}
-            />
-          ))}
-        </div> */}
-        {showParticipants && (
+          {/* <div className="flex gap-3 flex-col">
+            {participants.map((particip, i) => (
+              <CallParticipant
+                key={i}
+                participant={particip}
+                raisedHand={true}
+              />
+            ))}
+          </div> */}
+          <div className="flex gap-3 flex-col mt-3">
+            {[
+              // First, participants who raised hand (preserving their order in handRaisers)
+              ...handRaisers
+                .map(hr => participants.find(p => p.userId === hr.userId))
+                .filter((p): p is StreamVideoParticipant => !!p),
+              // Then, the rest
+              ...participants.filter(
+                p => !handRaisers.some(hr => hr.userId === p.userId)
+              ),
+            ].map((particip, i) => (
+              <CallParticipant
+                key={i}
+                participant={particip}
+                raisedHand={handRaisers.some(hr => hr.userId === particip.userId)}
+              />
+            ))}
+          </div>
+
+        </div>
+        {/* {showParticipants && (
           <div className="p-3">
             <CallParticipantsList onClose={() => setShowParticipants(false)} />
           </div>
-        )}
+        )} */}
       </div>
 
       {isMeetingOwner && receivedJoinRequest && (<div className="absolute bottom-5 right-5 border-2 border-border rounded-md p-4 bg-white w-[300px] flex flex-col gap-4">

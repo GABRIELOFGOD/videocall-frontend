@@ -40,7 +40,6 @@ const MeetingSetup = ({
     if (call) {
       call.on("custom", (event: CustomVideoEvent) => {
         const payload = event.custom;
-        console.log("[PAYLOAD]: ", payload);
         if (payload.type === "request_accepted") {
           if (payload.users.length > 0) {
             payload.users.some((user: string) => {
