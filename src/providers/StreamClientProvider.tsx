@@ -10,7 +10,7 @@ import SentimentalComponent from "@/components/create-meeting-dialog";
 // const apiKey = process.env.NEXT_PUBLIC_STREAM_API_KEY!;
 
 const StreamVideoProvider = ({ children }: { children: ReactNode }) => {
-  const { user, isLoaded, variables: { apiKey } } = useUser();
+  const { user, isLoaded, variables: { apiKey, apiSecret } } = useUser();
   const [videoClient, setVideoClient] = useState<StreamVideoClient>();
   const [userReady, setUserReady] = useState(false);
   
@@ -29,7 +29,7 @@ const StreamVideoProvider = ({ children }: { children: ReactNode }) => {
           id: user.id,
           name: user.name || user.id,
         },
-        tokenProvider: () => tokenProvider(user),
+        tokenProvider: () => tokenProvider(user, apiKey, apiSecret),
       });
 
       setVideoClient(client);
