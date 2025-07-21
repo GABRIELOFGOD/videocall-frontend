@@ -24,7 +24,8 @@ export interface User {
 interface UserContextType {
   user: User | null;
   isLoaded: boolean;
-  setUser: Dispatch<SetStateAction<User | null>>
+  setUser: Dispatch<SetStateAction<User | null>>,
+  variables: {appId: string, apiKey: string, apiSecret: string}
 }
 
 const UserProviderContext = createContext<UserContextType | undefined>(undefined);
@@ -32,6 +33,31 @@ const UserProviderContext = createContext<UserContextType | undefined>(undefined
 const UserProvider = ({ children }: { children: ReactNode }) => {
   const [user, setUser] = useState<User | null>(null);
   const [isLoaded, setIsLoaded] = useState<boolean>(false);
+  const [variables, setVariables] = useState({
+    apiKey: "",
+    apiSecret: "",
+    appId: ""
+  });
+
+  const getVaribales = async () => {
+    try {
+      const req = await fetch(`${BASEURL}/api/environment`);
+      const res = await req.json();
+      if (!req.ok) throw new Error(res.error.message);
+
+      setVariables({
+        apiKey: res.api_key,
+        apiSecret: res.api_secret,
+        appId: res.app_id
+      });
+      // form.setValue("api_key", res.api_key);
+      // form.setValue("api_secret", res.api_secret);
+      // form.setValue("app_id", res.app_id);
+      // setEnvID(res.id);
+    } catch  (error: unknown) {
+      console.error("Unknown error", error);
+    }
+  }
 
   const getUser = async () => {
     try {
@@ -60,11 +86,12 @@ const UserProvider = ({ children }: { children: ReactNode }) => {
   };
 
   useEffect(() => {
+    getVaribales();
     getUser();
   }, []);
 
   return (
-    <UserProviderContext.Provider value={{ user, isLoaded, setUser }}>
+    <UserProviderContext.Provider value={{ user, isLoaded, setUser, variables }}>
       {children}
     </UserProviderContext.Provider>
   );

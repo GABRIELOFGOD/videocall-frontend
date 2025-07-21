@@ -7,13 +7,13 @@ import Loader from "@/components/loader";
 import { useUser } from "./UserProvider";
 import SentimentalComponent from "@/components/create-meeting-dialog";
 
-const apiKey = process.env.NEXT_PUBLIC_STREAM_API_KEY!;
+// const apiKey = process.env.NEXT_PUBLIC_STREAM_API_KEY!;
 
 const StreamVideoProvider = ({ children }: { children: ReactNode }) => {
-  const { user, isLoaded } = useUser();
+  const { user, isLoaded, variables: { apiKey } } = useUser();
   const [videoClient, setVideoClient] = useState<StreamVideoClient>();
   const [userReady, setUserReady] = useState(false);
-
+  
   useEffect(() => {
     if (isLoaded) {
       if (!user) {
