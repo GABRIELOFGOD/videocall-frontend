@@ -7,6 +7,8 @@ import {
   // CallParticipantsList,
   CallStatsButton,
   SpeakerLayout,
+  PaginatedGridLayout,
+  // layout // TODO: change layout
   useCall,
   useCallStateHooks,
   OwnCapability,
@@ -23,7 +25,7 @@ import {
   StreamVideoParticipant,
 } from "@stream-io/video-react-sdk";
 import { useEffect, useState } from "react";
-import { Hand, MicOff, UserPlus, Users, X } from "lucide-react";
+import { Hand, LayoutIcon, MicOff, UserPlus, Users, X } from "lucide-react";
 import { useSearchParams } from "next/navigation";
 // import EndCallButton from "./ui/end-call-button";
 import Loader from "./loader";
@@ -42,6 +44,7 @@ const MeetingRoom = ({ meeting }: { meeting: Meet | null }) => {
   const searchParams = useSearchParams();
   const isPersonalRoom = !!searchParams.get("personal");
   const [showControl, setShowControl] = useState<boolean>(false);
+  const [videoLayout, setVideoLayout] = useState<"grid" | "speaker">("grid");
 
   const [receivedJoinRequest, setReceivedJoinRequest] =
     useState<boolean>(false);
@@ -242,7 +245,11 @@ const MeetingRoom = ({ meeting }: { meeting: Meet | null }) => {
                 </div>
               </div>
             )}
-            <SpeakerLayout participantsBarPosition={null} />
+            {videoLayout === "speaker" ? (
+              <SpeakerLayout participantsBarPosition={null} />
+            ) : (
+              <PaginatedGridLayout />
+            )}
           </div>
         </div>
 
@@ -314,6 +321,18 @@ const MeetingRoom = ({ meeting }: { meeting: Meet | null }) => {
             className="rounded bg-white/10 p-2 hover:bg-white/20 cursor-pointer"
           >
             <Users size={20} />
+          </button>
+          <button
+            onClick={() => {
+              if (videoLayout === "grid") {
+                setVideoLayout("speaker");
+              } else {
+                setVideoLayout("grid");
+              }
+            }}
+            className="rounded bg-white/10 p-2 hover:bg-white/20 cursor-pointer"
+          >
+            <LayoutIcon size={20} />
           </button>
           <button
             onClick={
